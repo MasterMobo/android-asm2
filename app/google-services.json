@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "130348297877",
+    "project_id": "moboblooddono",
+    "storage_bucket": "moboblooddono.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:130348297877:android:596b383ac6f82f5866759c",
+        "android_client_info": {
+          "package_name": "com.example.blooddono"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCgU-lrYRPludv-EnFItRSycB2Gvwm_K0E"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
