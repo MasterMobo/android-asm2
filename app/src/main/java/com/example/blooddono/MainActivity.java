@@ -51,29 +51,37 @@ public class MainActivity extends AppCompatActivity {
                 .findFragmentById(R.id.nav_host_fragment);
         navController = navHostFragment.getNavController();
 
-        // Check user role and setup navigation
-        checkUserRoleAndSetupNavigation();
+        // Setup ActionBar with NavController
+        NavigationUI.setupActionBarWithNavController(this, navController);
 
+        // Connect bottom nav with nav controller
+        NavigationUI.setupWithNavController(bottomNav, navController);
 
+        // Check user role and setup appropriate navigation
+        setupNavigationForUserRole();
     }
 
-    private void checkUserRoleAndSetupNavigation() {
+    private void setupNavigationForUserRole() {
         FirebaseUser currentUser = mAuth.getCurrentUser();
         if (currentUser != null) {
             userRepository.getUser(currentUser.getUid(), new UserRepository.OnCompleteListener<User>() {
                 @Override
                 public void onSuccess(User user) {
+                    // Set the appropriate menu based on user role
                     if (user.getRole().equals(User.ROLE_DONOR)) {
-                        // Hide the register site menu item for donors
-                        bottomNav.getMenu().removeItem(R.id.siteRegistrationFragment);
+                        bottomNav.getMenu().clear();
+                        bottomNav.inflateMenu(R.menu.donor_nav_menu);
+                    } else {
+                        bottomNav.getMenu().clear();
+                        bottomNav.inflateMenu(R.menu.manager_nav_menu);
                     }
+
                     // Connect bottom nav with nav controller
                     NavigationUI.setupWithNavController(bottomNav, navController);
                 }
 
                 @Override
                 public void onError(Exception e) {
-                    // Handle error
                     Toast.makeText(MainActivity.this,
                             "Error loading user profile", Toast.LENGTH_SHORT).show();
                     mAuth.signOut();
@@ -88,8 +96,14 @@ public class MainActivity extends AppCompatActivity {
         super.onStart();
         // Check if user is signed in
         if (mAuth.getCurrentUser() == null) {
+            // Not signed in, return to login
             logout();
         }
+    }
+
+    @Override
+    public boolean onSupportNavigateUp() {
+        return navController.navigateUp() || super.onSupportNavigateUp();
     }
 
     private void logout() {

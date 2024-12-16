@@ -1,6 +1,9 @@
 package com.example.blooddono.repositories;
 
+import android.util.Log;
+
 import com.example.blooddono.models.DonationSite;
+import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
@@ -29,7 +32,11 @@ public class DonationSiteRepository {
      * Add a new donation site to Firestore
      */
     public void addDonationSite(DonationSite site, OnCompleteListener<String> listener) {
+        // Add owner ID before saving
+        site.setOwnerId(FirebaseAuth.getInstance().getCurrentUser().getUid());
+
         Map<String, Object> siteData = new HashMap<>();
+        siteData.put("ownerId", site.getOwnerId());
         siteData.put("name", site.getName());
         siteData.put("description", site.getDescription());
         siteData.put("latitude", site.getLatitude());
@@ -42,11 +49,8 @@ public class DonationSiteRepository {
                 .addOnSuccessListener(documentReference -> {
                     listener.onSuccess(documentReference.getId());
                 })
-                .addOnFailureListener(e -> {
-                    listener.onError(e);
-                });
+                .addOnFailureListener(listener::onError);
     }
-
     /**
      * Get a donation site by ID
      */
@@ -112,13 +116,34 @@ public class DonationSiteRepository {
                 .addOnFailureListener(listener::onError);
     }
 
+    public void getDonationSitesByOwner(String ownerId, OnCompleteListener<List<DonationSite>> listener) {
+        db.collection(COLLECTION_NAME)
+                .whereEqualTo("ownerId", ownerId)
+                .get()
+                .addOnSuccessListener(queryDocumentSnapshots -> {
+                    List<DonationSite> sites = new ArrayList<>();
+                    for (DocumentSnapshot document : queryDocumentSnapshots) {
+                        DonationSite site = documentToDonationSite(document);
+                        site.setId(document.getId());
+                        sites.add(site);
+                    }
+                    listener.onSuccess(sites);
+                })
+                .addOnFailureListener(e -> {
+                    listener.onError(e);
+                });
+    }
+
+
     private DonationSite documentToDonationSite(DocumentSnapshot document) {
-        return new DonationSite(
+        DonationSite site = new DonationSite(
                 document.getString("name"),
                 document.getString("description"),
                 document.getDouble("latitude"),
                 document.getDouble("longitude"),
                 document.getString("address")
         );
+        site.setOwnerId(document.getString("ownerId"));
+        return site;
     }
 }

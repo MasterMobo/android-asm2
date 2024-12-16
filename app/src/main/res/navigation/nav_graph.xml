@@ -7,7 +7,11 @@
     <fragment
         android:id="@+id/sitesMapFragment"
         android:name="com.example.blooddono.fragments.SitesMapFragment"
-        android:label="Map" />
+        android:label="Map">
+        <action
+            android:id="@+id/action_sitesMapFragment_to_siteDetailFragment"
+            app:destination="@id/siteDetailFragment" />
+    </fragment>
 
     <fragment
         android:id="@+id/siteRegistrationFragment"
@@ -18,6 +22,27 @@
         android:id="@+id/profileFragment"
         android:name="com.example.blooddono.fragments.ProfileFragment"
         android:label="Profile" />
+
+    <fragment
+        android:id="@+id/mySitesFragment"
+        android:name="com.example.blooddono.fragments.MySitesFragment"
+        android:label="My Sites">
+        <action
+            android:id="@+id/action_mySitesFragment_to_siteRegistrationFragment"
+            app:destination="@id/siteRegistrationFragment" />
+        <action
+            android:id="@+id/action_mySitesFragment_to_siteDetailFragment"
+            app:destination="@id/siteDetailFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/siteDetailFragment"
+        android:name="com.example.blooddono.fragments.SiteDetailFragment"
+        android:label="Site Details">
+        <argument
+            android:name="siteId"
+            app:argType="string" />
+    </fragment>
 
 
 </navigation>
