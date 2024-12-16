@@ -57,6 +57,35 @@
 
     </com.google.android.material.textfield.TextInputLayout>
 
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Select Role"
+        android:textSize="16sp"
+        android:textStyle="bold"
+        android:layout_marginBottom="8dp"/>
+
+    <RadioGroup
+        android:id="@+id/roleRadioGroup"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:layout_marginBottom="24dp">
+
+        <RadioButton
+            android:id="@+id/donorRadio"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Donor"/>
+
+        <RadioButton
+            android:id="@+id/managerRadio"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Site Manager"/>
+
+    </RadioGroup>
+
     <Button
         android:id="@+id/registerButton"
         android:layout_width="match_parent"

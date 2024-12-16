@@ -8,4 +8,8 @@
         android:id="@+id/siteRegistrationFragment"
         android:icon="@android:drawable/ic_menu_add"
         android:title="Register" />
+    <item
+        android:id="@+id/profileFragment"
+        android:icon="@android:drawable/ic_menu_myplaces"
+        android:title="Profile" />
 </menu>

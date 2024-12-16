@@ -14,5 +14,10 @@
         android:name="com.example.blooddono.fragments.SiteRegistrationFormFragment"
         android:label="Register" />
 
+    <fragment
+        android:id="@+id/profileFragment"
+        android:name="com.example.blooddono.fragments.ProfileFragment"
+        android:label="Profile" />
+
 
 </navigation>
