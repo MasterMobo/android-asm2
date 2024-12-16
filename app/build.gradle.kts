@@ -45,4 +45,5 @@ dependencies {
     implementation(libs.play.services.maps)
     implementation("androidx.navigation:navigation-fragment:2.5.3")
     implementation("androidx.navigation:navigation-ui:2.5.3")
+    implementation("com.google.firebase:firebase-auth:22.3.1")
 }
