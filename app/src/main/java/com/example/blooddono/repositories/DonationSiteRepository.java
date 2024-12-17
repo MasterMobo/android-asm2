@@ -42,7 +42,14 @@ public class DonationSiteRepository {
         siteData.put("latitude", site.getLatitude());
         siteData.put("longitude", site.getLongitude());
         siteData.put("address", site.getAddress());
+        siteData.put("type", site.getType());
         siteData.put("createdAt", FieldValue.serverTimestamp());
+
+        // Only add dates if it's a limited time site
+        if (DonationSite.TYPE_LIMITED.equals(site.getType())) {
+            siteData.put("startDate", site.getStartDate());
+            siteData.put("endDate", site.getEndDate());
+        }
 
         db.collection(COLLECTION_NAME)
                 .add(siteData)
@@ -51,6 +58,7 @@ public class DonationSiteRepository {
                 })
                 .addOnFailureListener(listener::onError);
     }
+
     /**
      * Get a donation site by ID
      */
@@ -70,16 +78,29 @@ public class DonationSiteRepository {
     }
 
     /**
-     * Get all donation sites
+     * Get all active donation sites
+     * For limited time sites, only return those within their date range
      */
     public void getAllDonationSites(OnCompleteListener<List<DonationSite>> listener) {
+        long currentTime = System.currentTimeMillis();
+
         db.collection(COLLECTION_NAME)
                 .orderBy("createdAt", Query.Direction.DESCENDING)
                 .get()
                 .addOnSuccessListener(queryDocumentSnapshots -> {
                     List<DonationSite> sites = new ArrayList<>();
                     for (DocumentSnapshot document : queryDocumentSnapshots) {
-                        sites.add(documentToDonationSite(document));
+                        DonationSite site = documentToDonationSite(document);
+
+                        // For limited time sites, check if they're currently active
+                        if (DonationSite.TYPE_LIMITED.equals(site.getType())) {
+                            if (site.getStartDate() <= currentTime && site.getEndDate() >= currentTime) {
+                                sites.add(site);
+                            }
+                        } else {
+                            // Add permanent sites
+                            sites.add(site);
+                        }
                     }
                     listener.onSuccess(sites);
                 })
@@ -107,7 +128,18 @@ public class DonationSiteRepository {
         updates.put("latitude", site.getLatitude());
         updates.put("longitude", site.getLongitude());
         updates.put("address", site.getAddress());
+        updates.put("type", site.getType());
         updates.put("updatedAt", FieldValue.serverTimestamp());
+
+        // Only update dates if it's a limited time site
+        if (DonationSite.TYPE_LIMITED.equals(site.getType())) {
+            updates.put("startDate", site.getStartDate());
+            updates.put("endDate", site.getEndDate());
+        } else {
+            // Remove date fields if switching to permanent type
+            updates.put("startDate", FieldValue.delete());
+            updates.put("endDate", FieldValue.delete());
+        }
 
         db.collection(COLLECTION_NAME)
                 .document(siteId)
@@ -116,6 +148,9 @@ public class DonationSiteRepository {
                 .addOnFailureListener(listener::onError);
     }
 
+    /**
+     * Get all donation sites owned by a user, including inactive ones
+     */
     public void getDonationSitesByOwner(String ownerId, OnCompleteListener<List<DonationSite>> listener) {
         db.collection(COLLECTION_NAME)
                 .whereEqualTo("ownerId", ownerId)
@@ -129,21 +164,28 @@ public class DonationSiteRepository {
                     }
                     listener.onSuccess(sites);
                 })
-                .addOnFailureListener(e -> {
-                    listener.onError(e);
-                });
+                .addOnFailureListener(listener::onError);
     }
 
 
     private DonationSite documentToDonationSite(DocumentSnapshot document) {
+        String type = document.getString("type");
+        if (type == null) {
+            type = DonationSite.TYPE_PERMANENT; // Default for backward compatibility
+        }
+
         DonationSite site = new DonationSite(
                 document.getString("name"),
                 document.getString("description"),
                 document.getDouble("latitude"),
                 document.getDouble("longitude"),
-                document.getString("address")
+                document.getString("address"),
+                type,
+                document.getLong("startDate"),
+                document.getLong("endDate")
         );
         site.setOwnerId(document.getString("ownerId"));
+        site.setId(document.getId());
         return site;
     }
 }

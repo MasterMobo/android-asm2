@@ -52,6 +52,92 @@
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:text="Site Type"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:layout_marginTop="16dp"
+            android:layout_marginBottom="8dp"/>
+
+        <RadioGroup
+            android:id="@+id/typeRadioGroup"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginBottom="16dp">
+
+            <RadioButton
+                android:id="@+id/permanentRadio"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Permanent"/>
+
+            <TextView
+                android:id="@+id/permanentDescription"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Site will remain active until manually closed"
+                android:textSize="12sp"
+                android:textColor="?android:textColorSecondary"
+                android:layout_marginStart="32dp"
+                android:layout_marginBottom="8dp"/>
+
+            <RadioButton
+                android:id="@+id/limitedRadio"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Limited Time"/>
+
+            <TextView
+                android:id="@+id/limitedDescription"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Site will be active only between specified dates"
+                android:textSize="12sp"
+                android:textColor="?android:textColorSecondary"
+                android:layout_marginStart="32dp"/>
+
+        </RadioGroup>
+
+        <LinearLayout
+            android:id="@+id/dateSelectionLayout"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <Button
+                android:id="@+id/startDateButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Select Start Date"
+                android:layout_marginBottom="8dp"/>
+
+            <TextView
+                android:id="@+id/startDateText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:layout_marginBottom="16dp"/>
+
+            <Button
+                android:id="@+id/endDateButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Select End Date"
+                android:layout_marginBottom="8dp"/>
+
+            <TextView
+                android:id="@+id/endDateText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:layout_marginBottom="16dp"/>
+
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
             android:text="Location"
             android:textSize="16sp"
             android:textStyle="bold"
