@@ -22,6 +22,7 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.RadioGroup;
+import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -88,9 +89,14 @@ public class SiteRegistrationFormFragment extends Fragment {
         hoursTypeRadioGroup = view.findViewById(R.id.hoursTypeRadioGroup);
         operatingHoursRecyclerView = view.findViewById(R.id.operatingHoursRecyclerView);
         operatingHoursAdapter = new OperatingHoursAdapter(requireContext());
-        operatingHoursRecyclerView.setAdapter(operatingHoursAdapter);
-        operatingHoursRecyclerView.setLayoutManager(new LinearLayoutManager(requireContext()));
 
+        operatingHoursRecyclerView.setAdapter(operatingHoursAdapter);
+        operatingHoursRecyclerView.setLayoutManager(new LinearLayoutManager(requireContext()) {
+            @Override
+            public boolean canScrollVertically() {
+                return true;
+            }
+        });
         selectLocationButton.setOnClickListener(v -> {
             Intent intent = new Intent(requireActivity(), LocationPickerActivity.class);
             LatLng currentLocation = locationPreview.getLocation();
@@ -111,11 +117,9 @@ public class SiteRegistrationFormFragment extends Fragment {
 
         // Setup hours type radio group listener
         hoursTypeRadioGroup.setOnCheckedChangeListener((group, checkedId) -> {
-            if (checkedId == R.id.hoursSpecificRadio) {
-                operatingHoursRecyclerView.setVisibility(View.VISIBLE);
-            } else {
-                operatingHoursRecyclerView.setVisibility(View.GONE);
-            }
+            operatingHoursRecyclerView.setVisibility(
+                    checkedId == R.id.hoursSpecificRadio ? View.VISIBLE : View.GONE
+            );
         });
 
         submitButton.setOnClickListener(v -> handleSubmit());
