@@ -2,7 +2,16 @@
 <navigation xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/nav_graph"
-    app:startDestination="@id/sitesMapFragment">
+    app:startDestination="@id/discoverFragment">
+
+    <fragment
+        android:id="@+id/discoverFragment"
+        android:name="com.example.blooddono.fragments.DiscoverFragment"
+        android:label="Discover">
+        <action
+            android:id="@+id/action_discoverFragment_to_siteDetailFragment"
+            app:destination="@id/siteDetailFragment" />
+    </fragment>
 
     <fragment
         android:id="@+id/sitesMapFragment"
@@ -43,6 +52,5 @@
             android:name="siteId"
             app:argType="string" />
     </fragment>
-
 
 </navigation>

@@ -95,16 +95,7 @@ public class DonationSiteRepository {
                     List<DonationSite> sites = new ArrayList<>();
                     for (DocumentSnapshot document : queryDocumentSnapshots) {
                         DonationSite site = documentToDonationSite(document);
-
-                        // For limited time sites, check if they're currently active
-                        if (DonationSite.TYPE_LIMITED.equals(site.getType())) {
-                            if (site.getStartDate() <= currentTime && site.getEndDate() >= currentTime) {
-                                sites.add(site);
-                            }
-                        } else {
-                            // Add permanent sites
-                            sites.add(site);
-                        }
+                        sites.add(site);
                     }
                     listener.onSuccess(sites);
                 })

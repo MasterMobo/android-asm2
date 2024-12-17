@@ -1,32 +1,18 @@
 package com.example.blooddono;
 
-import android.app.AlertDialog;
-import android.app.ProgressDialog;
 import android.content.Intent;
 import android.os.Bundle;
-import android.util.Log;
-import android.widget.Button;
-import android.widget.EditText;
 import android.widget.Toast;
-
-import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.navigation.NavController;
 import androidx.navigation.fragment.NavHostFragment;
 import androidx.navigation.ui.NavigationUI;
-
-import com.example.blooddono.activities.LocationPickerActivity;
 import com.example.blooddono.activities.LoginActivity;
-import com.example.blooddono.models.DonationSite;
 import com.example.blooddono.models.User;
-import com.example.blooddono.repositories.DonationSiteRepository;
 import com.example.blooddono.repositories.UserRepository;
-import com.example.blooddono.views.LocationPreviewView;
-import com.google.android.gms.maps.model.LatLng;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
-
 
 public class MainActivity extends AppCompatActivity {
     private BottomNavigationView bottomNav;
@@ -54,9 +40,6 @@ public class MainActivity extends AppCompatActivity {
         // Setup ActionBar with NavController
         NavigationUI.setupActionBarWithNavController(this, navController);
 
-        // Connect bottom nav with nav controller
-        NavigationUI.setupWithNavController(bottomNav, navController);
-
         // Check user role and setup appropriate navigation
         setupNavigationForUserRole();
     }
@@ -71,13 +54,20 @@ public class MainActivity extends AppCompatActivity {
                     if (user.getRole().equals(User.ROLE_DONOR)) {
                         bottomNav.getMenu().clear();
                         bottomNav.inflateMenu(R.menu.donor_nav_menu);
+                        // Set start destination to Discover for donors
+                        navController.getGraph().setStartDestination(R.id.discoverFragment);
                     } else {
                         bottomNav.getMenu().clear();
                         bottomNav.inflateMenu(R.menu.manager_nav_menu);
+                        // Set start destination to My Sites for managers
+                        navController.getGraph().setStartDestination(R.id.mySitesFragment);
                     }
 
                     // Connect bottom nav with nav controller
                     NavigationUI.setupWithNavController(bottomNav, navController);
+
+                    // Navigate to start destination
+                    navController.navigate(navController.getGraph().getStartDestination());
                 }
 
                 @Override
