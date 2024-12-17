@@ -2,6 +2,7 @@ package com.example.blooddono.repositories;
 
 import android.util.Log;
 
+import com.example.blooddono.models.DayHours;
 import com.example.blooddono.models.DonationSite;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.DocumentSnapshot;
@@ -43,6 +44,7 @@ public class DonationSiteRepository {
         siteData.put("longitude", site.getLongitude());
         siteData.put("address", site.getAddress());
         siteData.put("type", site.getType());
+        siteData.put("hoursType", site.getHoursType());
         siteData.put("createdAt", FieldValue.serverTimestamp());
 
         // Only add dates if it's a limited time site
@@ -51,11 +53,13 @@ public class DonationSiteRepository {
             siteData.put("endDate", site.getEndDate());
         }
 
+        if (DonationSite.HOURS_SPECIFIC.equals(site.getHoursType())) {
+            siteData.put("operatingHours", site.getOperatingHours());
+        }
+
         db.collection(COLLECTION_NAME)
                 .add(siteData)
-                .addOnSuccessListener(documentReference -> {
-                    listener.onSuccess(documentReference.getId());
-                })
+                .addOnSuccessListener(documentReference -> listener.onSuccess(documentReference.getId()))
                 .addOnFailureListener(listener::onError);
     }
 
@@ -129,6 +133,7 @@ public class DonationSiteRepository {
         updates.put("longitude", site.getLongitude());
         updates.put("address", site.getAddress());
         updates.put("type", site.getType());
+        updates.put("hoursType", site.getHoursType());
         updates.put("updatedAt", FieldValue.serverTimestamp());
 
         // Only update dates if it's a limited time site
@@ -139,6 +144,12 @@ public class DonationSiteRepository {
             // Remove date fields if switching to permanent type
             updates.put("startDate", FieldValue.delete());
             updates.put("endDate", FieldValue.delete());
+        }
+
+        if (DonationSite.HOURS_SPECIFIC.equals(site.getHoursType())) {
+            updates.put("operatingHours", site.getOperatingHours());
+        } else {
+            updates.put("operatingHours", FieldValue.delete());
         }
 
         db.collection(COLLECTION_NAME)
@@ -168,10 +179,31 @@ public class DonationSiteRepository {
     }
 
 
+
     private DonationSite documentToDonationSite(DocumentSnapshot document) {
         String type = document.getString("type");
         if (type == null) {
             type = DonationSite.TYPE_PERMANENT; // Default for backward compatibility
+        }
+
+        String hoursType = document.getString("hoursType");
+        if (hoursType == null) {
+            hoursType = DonationSite.HOURS_24_7; // Default for backward compatibility
+        }
+
+        // Convert Firestore Map to operating hours Map
+        Map<String, DayHours> operatingHours = new HashMap<>();
+        Map<String, Object> hoursData = (Map<String, Object>) document.get("operatingHours");
+        if (hoursData != null) {
+            for (Map.Entry<String, Object> entry : hoursData.entrySet()) {
+                Map<String, Object> dayData = (Map<String, Object>) entry.getValue();
+                DayHours dayHours = new DayHours(
+                        (boolean) dayData.get("open"),
+                        (String) dayData.get("openTime"),
+                        (String) dayData.get("closeTime")
+                );
+                operatingHours.put(entry.getKey(), dayHours);
+            }
         }
 
         DonationSite site = new DonationSite(
@@ -182,7 +214,9 @@ public class DonationSiteRepository {
                 document.getString("address"),
                 type,
                 document.getLong("startDate"),
-                document.getLong("endDate")
+                document.getLong("endDate"),
+                hoursType,
+                operatingHours
         );
         site.setOwnerId(document.getString("ownerId"));
         site.setId(document.getId());

@@ -1,8 +1,12 @@
 package com.example.blooddono.models;
 
+import java.util.Map;
+
 public class DonationSite {
     public static final String TYPE_PERMANENT = "permanent";
     public static final String TYPE_LIMITED = "limited";
+    public static final String HOURS_24_7 = "24/7";
+    public static final String HOURS_SPECIFIC = "specific";
 
     private String id;
     private String ownerId;
@@ -14,13 +18,16 @@ public class DonationSite {
     private String type; // permanent or limited
     private long startDate; // timestamp for limited type
     private long endDate;   // timestamp for limited type
+    private String hoursType; // 24/7 or specific
+    private Map<String, DayHours> operatingHours; // Day of week -> operating hours
 
     public DonationSite() {
         // Required empty constructor for Firebase
     }
 
-    public DonationSite(String name, String description, double latitude, double longitude, String address,
-                        String type, Long startDate, Long endDate) {
+    public DonationSite(String name, String description, double latitude, double longitude,
+                        String address, String type, Long startDate, Long endDate,
+                        String hoursType, Map<String, DayHours> operatingHours) {
         this.name = name;
         this.description = description;
         this.latitude = latitude;
@@ -29,6 +36,8 @@ public class DonationSite {
         this.type = type;
         this.startDate = startDate != null ? startDate : 0;
         this.endDate = endDate != null ? endDate : 0;
+        this.hoursType = hoursType;
+        this.operatingHours = operatingHours;
     }
 
     // Add getters and setters for new fields
@@ -48,6 +57,12 @@ public class DonationSite {
     public String getDescription() { return description; }
     public double getLatitude() { return latitude; }
     public double getLongitude() { return longitude; }
+    public String getHoursType() { return hoursType; }
+    public void setHoursType(String hoursType) { this.hoursType = hoursType; }
+    public Map<String, DayHours> getOperatingHours() { return operatingHours; }
+    public void setOperatingHours(Map<String, DayHours> operatingHours) {
+        this.operatingHours = operatingHours;
+    }
 
 
     public String getAddress() {

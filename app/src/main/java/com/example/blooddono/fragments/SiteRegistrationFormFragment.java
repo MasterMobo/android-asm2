@@ -11,6 +11,8 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.fragment.app.Fragment;
 import androidx.navigation.NavController;
 import androidx.navigation.Navigation;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -25,15 +27,19 @@ import android.widget.Toast;
 
 import com.example.blooddono.R;
 import com.example.blooddono.activities.LocationPickerActivity;
+import com.example.blooddono.adapters.OperatingHoursAdapter;
+import com.example.blooddono.models.DayHours;
 import com.example.blooddono.models.DonationSite;
 import com.example.blooddono.repositories.DonationSiteRepository;
 import com.example.blooddono.views.LocationPreviewView;
 import com.google.android.gms.maps.model.LatLng;
 
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.Locale;
+import java.util.Map;
 
 public class SiteRegistrationFormFragment extends Fragment {
     private static final int PICK_LOCATION_REQUEST = 1;
@@ -51,6 +57,9 @@ public class SiteRegistrationFormFragment extends Fragment {
     private TextView endDateText;
     private long selectedStartDate = 0;
     private long selectedEndDate = 0;
+    private RadioGroup hoursTypeRadioGroup;
+    private RecyclerView operatingHoursRecyclerView;
+    private OperatingHoursAdapter operatingHoursAdapter;
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
@@ -76,6 +85,11 @@ public class SiteRegistrationFormFragment extends Fragment {
         endDateButton = view.findViewById(R.id.endDateButton);
         startDateText = view.findViewById(R.id.startDateText);
         endDateText = view.findViewById(R.id.endDateText);
+        hoursTypeRadioGroup = view.findViewById(R.id.hoursTypeRadioGroup);
+        operatingHoursRecyclerView = view.findViewById(R.id.operatingHoursRecyclerView);
+        operatingHoursAdapter = new OperatingHoursAdapter(requireContext());
+        operatingHoursRecyclerView.setAdapter(operatingHoursAdapter);
+        operatingHoursRecyclerView.setLayoutManager(new LinearLayoutManager(requireContext()));
 
         selectLocationButton.setOnClickListener(v -> {
             Intent intent = new Intent(requireActivity(), LocationPickerActivity.class);
@@ -92,6 +106,15 @@ public class SiteRegistrationFormFragment extends Fragment {
                 dateSelectionLayout.setVisibility(View.VISIBLE);
             } else {
                 dateSelectionLayout.setVisibility(View.GONE);
+            }
+        });
+
+        // Setup hours type radio group listener
+        hoursTypeRadioGroup.setOnCheckedChangeListener((group, checkedId) -> {
+            if (checkedId == R.id.hoursSpecificRadio) {
+                operatingHoursRecyclerView.setVisibility(View.VISIBLE);
+            } else {
+                operatingHoursRecyclerView.setVisibility(View.GONE);
             }
         });
 
@@ -186,69 +209,133 @@ public class SiteRegistrationFormFragment extends Fragment {
         String type = selectedTypeId == R.id.permanentRadio ?
                 DonationSite.TYPE_PERMANENT : DonationSite.TYPE_LIMITED;
 
+        // Validate dates for limited type
         if (type.equals(DonationSite.TYPE_LIMITED)) {
-            if (selectedStartDate == 0) {
-                Toast.makeText(requireContext(), "Please select a start date", Toast.LENGTH_SHORT).show();
-                return;
-            }
-            if (selectedEndDate == 0) {
-                Toast.makeText(requireContext(), "Please select an end date", Toast.LENGTH_SHORT).show();
+            if (selectedStartDate == 0 || selectedEndDate == 0) {
+                Toast.makeText(requireContext(), "Please select both start and end dates",
+                        Toast.LENGTH_SHORT).show();
                 return;
             }
         }
 
-        // Create donation site object
-        DonationSite site = new DonationSite(
-                name,
-                description,
-                location.latitude,
-                location.longitude,
-                address,
-                type,
-                type.equals(DonationSite.TYPE_LIMITED) ? selectedStartDate : null,
-                type.equals(DonationSite.TYPE_LIMITED) ? selectedEndDate : null
-        );
+        // Validate operating hours
+        int selectedHoursTypeId = hoursTypeRadioGroup.getCheckedRadioButtonId();
+        if (selectedHoursTypeId == -1) {
+            Toast.makeText(requireContext(), "Please select operating hours type",
+                    Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        String hoursType = selectedHoursTypeId == R.id.hours24Radio ?
+                DonationSite.HOURS_24_7 : DonationSite.HOURS_SPECIFIC;
+
+        // For specific hours, validate that at least one day is selected
+        Map<String, DayHours> operatingHours = null;
+        if (hoursType.equals(DonationSite.HOURS_SPECIFIC)) {
+            operatingHours = operatingHoursAdapter.getOperatingHours();
+            boolean hasOpenDay = false;
+            for (DayHours hours : operatingHours.values()) {
+                if (hours.isOpen()) {
+                    hasOpenDay = true;
+                    break;
+                }
+            }
+            if (!hasOpenDay) {
+                Toast.makeText(requireContext(),
+                        "Please select at least one day of operation",
+                        Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            // Validate time ranges
+            for (Map.Entry<String, DayHours> entry : operatingHours.entrySet()) {
+                DayHours hours = entry.getValue();
+                if (hours.isOpen()) {
+                    if (!isValidTimeRange(hours.getOpenTime(), hours.getCloseTime())) {
+                        Toast.makeText(requireContext(),
+                                "Invalid time range for " + entry.getKey(),
+                                Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                }
+            }
+        }
 
         // Show loading dialog
         ProgressDialog progressDialog = new ProgressDialog(requireContext());
         progressDialog.setMessage("Saving donation site...");
         progressDialog.show();
 
+        // Create donation site object
+        DonationSite site = new DonationSite(
+                nameInput.getText().toString().trim(),
+                descriptionInput.getText().toString().trim(),
+                locationPreview.getLocation().latitude,
+                locationPreview.getLocation().longitude,
+                locationPreview.getAddress(),
+                type,
+                type.equals(DonationSite.TYPE_LIMITED) ? selectedStartDate : null,
+                type.equals(DonationSite.TYPE_LIMITED) ? selectedEndDate : null,
+                hoursType,
+                operatingHours
+        );
+
         // Save to database
         repository.addDonationSite(site, new DonationSiteRepository.OnCompleteListener<String>() {
             @Override
             public void onSuccess(String documentId) {
                 progressDialog.dismiss();
-                Log.d("DonationSite", "New site registered with ID: " + documentId);
-
-                // Show success alert and navigate back to map
-                new AlertDialog.Builder(requireContext())
-                        .setTitle("Success")
-                        .setMessage("Blood donation site registered successfully!")
-                        .setPositiveButton("OK", (dialog, which) -> {
-                            // Clear form
-                            clearForm();
-                            // Navigate to map
-                            NavController navController = Navigation.findNavController(requireView());
-                            navController.navigate(R.id.sitesMapFragment);
-                        })
-                        .show();
+                showSuccessDialog();
             }
 
             @Override
             public void onError(Exception e) {
                 progressDialog.dismiss();
-
-                // Show error alert
-                new AlertDialog.Builder(requireContext())
-                        .setTitle("Error")
-                        .setMessage("Failed to register donation site: " + e.getMessage())
-                        .setPositiveButton("OK", null)
-                        .show();
-
-                Log.e("DonationSite", "Error adding document", e);
+                showErrorDialog(e.getMessage());
             }
         });
+    }
+
+    private boolean isValidTimeRange(String openTime, String closeTime) {
+        try {
+            SimpleDateFormat sdf = new SimpleDateFormat("HH:mm", Locale.getDefault());
+            Date openDate = sdf.parse(openTime);
+            Date closeDate = sdf.parse(closeTime);
+
+            // If close time is earlier than open time, consider it invalid
+            return openDate != null && closeDate != null &&
+                    (closeDate.after(openDate) || closeTime.equals("00:00"));
+        } catch (ParseException e) {
+            return false;
+        }
+    }
+
+    private void showSuccessDialog() {
+        new AlertDialog.Builder(requireContext())
+                .setTitle("Success")
+                .setMessage("Blood donation site registered successfully!")
+                .setPositiveButton("OK", (dialog, which) -> {
+                    // Clear form
+                    clearForm();
+                    // Navigate back
+                    NavController navController = Navigation.findNavController(requireView());
+                    navController.navigate(R.id.sitesMapFragment);
+                })
+                .show();
+    }
+
+    private void showErrorDialog(String message) {
+        new AlertDialog.Builder(requireContext())
+                .setTitle("Error")
+                .setMessage("Failed to register donation site: " + message)
+                .setPositiveButton("OK", null)
+                .show();
+    }
+
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        // Clean up any time picker dialogs that might be showing
     }
 
     private void clearForm() {

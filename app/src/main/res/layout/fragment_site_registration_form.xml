@@ -138,6 +138,60 @@
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:text="Opening Hours"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:layout_marginTop="16dp"
+            android:layout_marginBottom="8dp"/>
+
+        <RadioGroup
+            android:id="@+id/hoursTypeRadioGroup"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:layout_marginBottom="16dp">
+
+            <RadioButton
+                android:id="@+id/hours24Radio"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Open 24/7"/>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Site is open all day, every day"
+                android:textSize="12sp"
+                android:textColor="?android:textColorSecondary"
+                android:layout_marginStart="32dp"
+                android:layout_marginBottom="8dp"/>
+
+            <RadioButton
+                android:id="@+id/hoursSpecificRadio"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Specific Hours"/>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Set specific opening hours for each day"
+                android:textSize="12sp"
+                android:textColor="?android:textColorSecondary"
+                android:layout_marginStart="32dp"/>
+
+        </RadioGroup>
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/operatingHoursRecyclerView"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:visibility="gone"
+            android:layout_marginBottom="16dp"/>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
             android:text="Location"
             android:textSize="16sp"
             android:textStyle="bold"
