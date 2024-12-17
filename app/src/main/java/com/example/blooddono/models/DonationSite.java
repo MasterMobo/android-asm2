@@ -1,5 +1,6 @@
 package com.example.blooddono.models;
 
+import java.util.List;
 import java.util.Map;
 
 public class DonationSite {
@@ -7,6 +8,9 @@ public class DonationSite {
     public static final String TYPE_LIMITED = "limited";
     public static final String HOURS_24_7 = "24/7";
     public static final String HOURS_SPECIFIC = "specific";
+    public static final String[] BLOOD_TYPES = {
+            "A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"
+    };
 
     private String id;
     private String ownerId;
@@ -20,6 +24,7 @@ public class DonationSite {
     private long endDate;   // timestamp for limited type
     private String hoursType; // 24/7 or specific
     private Map<String, DayHours> operatingHours; // Day of week -> operating hours
+    private List<String> neededBloodTypes;
 
     public DonationSite() {
         // Required empty constructor for Firebase
@@ -27,7 +32,8 @@ public class DonationSite {
 
     public DonationSite(String name, String description, double latitude, double longitude,
                         String address, String type, Long startDate, Long endDate,
-                        String hoursType, Map<String, DayHours> operatingHours) {
+                        String hoursType, Map<String, DayHours> operatingHours,
+                        List<String> neededBloodTypes) {
         this.name = name;
         this.description = description;
         this.latitude = latitude;
@@ -38,6 +44,7 @@ public class DonationSite {
         this.endDate = endDate != null ? endDate : 0;
         this.hoursType = hoursType;
         this.operatingHours = operatingHours;
+        this.neededBloodTypes = neededBloodTypes;
     }
 
     // Add getters and setters for new fields
@@ -63,8 +70,10 @@ public class DonationSite {
     public void setOperatingHours(Map<String, DayHours> operatingHours) {
         this.operatingHours = operatingHours;
     }
-
-
+    public List<String> getNeededBloodTypes() { return neededBloodTypes; }
+    public void setNeededBloodTypes(List<String> neededBloodTypes) {
+        this.neededBloodTypes = neededBloodTypes;
+    }
     public String getAddress() {
         return address;
     }

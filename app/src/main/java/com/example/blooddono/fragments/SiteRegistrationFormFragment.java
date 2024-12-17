@@ -19,7 +19,9 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.CheckBox;
 import android.widget.EditText;
+import android.widget.GridLayout;
 import android.widget.LinearLayout;
 import android.widget.RadioGroup;
 import android.widget.ScrollView;
@@ -37,8 +39,10 @@ import com.google.android.gms.maps.model.LatLng;
 
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
@@ -61,6 +65,8 @@ public class SiteRegistrationFormFragment extends Fragment {
     private RadioGroup hoursTypeRadioGroup;
     private RecyclerView operatingHoursRecyclerView;
     private OperatingHoursAdapter operatingHoursAdapter;
+    private GridLayout bloodTypeGrid;
+    private List<String> selectedBloodTypes = new ArrayList<>();
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
@@ -88,6 +94,8 @@ public class SiteRegistrationFormFragment extends Fragment {
         endDateText = view.findViewById(R.id.endDateText);
         hoursTypeRadioGroup = view.findViewById(R.id.hoursTypeRadioGroup);
         operatingHoursRecyclerView = view.findViewById(R.id.operatingHoursRecyclerView);
+        bloodTypeGrid = view.findViewById(R.id.bloodTypeGrid);
+
         operatingHoursAdapter = new OperatingHoursAdapter(requireContext());
 
         operatingHoursRecyclerView.setAdapter(operatingHoursAdapter);
@@ -125,6 +133,7 @@ public class SiteRegistrationFormFragment extends Fragment {
         submitButton.setOnClickListener(v -> handleSubmit());
         startDateButton.setOnClickListener(v -> showDatePicker(true));
         endDateButton.setOnClickListener(v -> showDatePicker(false));
+        setupBloodTypeSelection();
     }
 
     @Override
@@ -265,6 +274,14 @@ public class SiteRegistrationFormFragment extends Fragment {
             }
         }
 
+        // Validate blood types
+        if (selectedBloodTypes.isEmpty()) {
+            Toast.makeText(requireContext(),
+                    "Please select at least one blood type needed",
+                    Toast.LENGTH_SHORT).show();
+            return;
+        }
+
         // Show loading dialog
         ProgressDialog progressDialog = new ProgressDialog(requireContext());
         progressDialog.setMessage("Saving donation site...");
@@ -281,7 +298,8 @@ public class SiteRegistrationFormFragment extends Fragment {
                 type.equals(DonationSite.TYPE_LIMITED) ? selectedStartDate : null,
                 type.equals(DonationSite.TYPE_LIMITED) ? selectedEndDate : null,
                 hoursType,
-                operatingHours
+                operatingHours,
+                selectedBloodTypes
         );
 
         // Save to database
@@ -299,6 +317,22 @@ public class SiteRegistrationFormFragment extends Fragment {
             }
         });
     }
+
+    private void setupBloodTypeSelection() {
+        for (String bloodType : DonationSite.BLOOD_TYPES) {
+            CheckBox checkBox = new CheckBox(requireContext());
+            checkBox.setText(bloodType);
+            checkBox.setOnCheckedChangeListener((buttonView, isChecked) -> {
+                if (isChecked) {
+                    selectedBloodTypes.add(bloodType);
+                } else {
+                    selectedBloodTypes.remove(bloodType);
+                }
+            });
+            bloodTypeGrid.addView(checkBox);
+        }
+    }
+
 
     private boolean isValidTimeRange(String openTime, String closeTime) {
         try {

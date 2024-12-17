@@ -45,6 +45,7 @@ public class DonationSiteRepository {
         siteData.put("address", site.getAddress());
         siteData.put("type", site.getType());
         siteData.put("hoursType", site.getHoursType());
+        siteData.put("neededBloodTypes", site.getNeededBloodTypes());
         siteData.put("createdAt", FieldValue.serverTimestamp());
 
         // Only add dates if it's a limited time site
@@ -169,8 +170,6 @@ public class DonationSiteRepository {
                 .addOnFailureListener(listener::onError);
     }
 
-
-
     private DonationSite documentToDonationSite(DocumentSnapshot document) {
         String type = document.getString("type");
         if (type == null) {
@@ -197,6 +196,13 @@ public class DonationSiteRepository {
             }
         }
 
+        // Get blood types with backward compatibility
+        List<String> neededBloodTypes = new ArrayList<>();
+        Object bloodTypesObj = document.get("neededBloodTypes");
+        if (bloodTypesObj instanceof List) {
+            neededBloodTypes = (List<String>) bloodTypesObj;
+        }
+
         DonationSite site = new DonationSite(
                 document.getString("name"),
                 document.getString("description"),
@@ -207,7 +213,8 @@ public class DonationSiteRepository {
                 document.getLong("startDate"),
                 document.getLong("endDate"),
                 hoursType,
-                operatingHours
+                operatingHours,
+                neededBloodTypes
         );
         site.setOwnerId(document.getString("ownerId"));
         site.setId(document.getId());

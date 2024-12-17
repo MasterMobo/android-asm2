@@ -1,5 +1,6 @@
 package com.example.blooddono.fragments;
 
+import android.graphics.Color;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -18,6 +19,8 @@ import com.example.blooddono.models.User;
 import com.example.blooddono.repositories.DonationSiteRepository;
 import com.example.blooddono.repositories.UserRepository;
 import com.google.android.material.card.MaterialCardView;
+import com.google.android.material.chip.Chip;
+import com.google.android.material.chip.ChipGroup;
 
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -36,6 +39,7 @@ public class SiteDetailFragment extends Fragment {
     private LinearLayout operatingHoursLayout;
     private MaterialCardView datesCard;
     private MaterialCardView hoursCard;
+    private ChipGroup bloodTypeChipGroup;
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
@@ -60,6 +64,7 @@ public class SiteDetailFragment extends Fragment {
         operatingHoursLayout = view.findViewById(R.id.operatingHoursLayout);
         datesCard = view.findViewById(R.id.datesCard);
         hoursCard = view.findViewById(R.id.hoursCard);
+        bloodTypeChipGroup = view.findViewById(R.id.bloodTypeChipGroup);
 
         // Get site ID from arguments
         String siteId = getArguments().getString("siteId");
@@ -77,9 +82,9 @@ public class SiteDetailFragment extends Fragment {
                 descriptionText.setText(site.getDescription());
                 addressText.setText(site.getAddress());
 
-                // Display availability and hours
                 displayAvailability(site);
                 displayOperatingHours(site);
+                displayBloodTypes(site);
 
                 // Load owner details
                 loadOwnerDetails(site.getOwnerId());
@@ -169,6 +174,27 @@ public class SiteDetailFragment extends Fragment {
         }
     }
 
+    private void displayBloodTypes(DonationSite site) {
+        // Display blood types
+        bloodTypeChipGroup.removeAllViews();
+        if (site.getNeededBloodTypes() != null && !site.getNeededBloodTypes().isEmpty()) {
+            for (String bloodType : site.getNeededBloodTypes()) {
+                Chip chip = new Chip(requireContext());
+                chip.setText(bloodType);
+                chip.setClickable(false);
+                chip.setChipBackgroundColorResource(R.color.design_default_color_primary);
+                chip.setTextColor(Color.WHITE);
+                bloodTypeChipGroup.addView(chip);
+            }
+        } else {
+            // If no blood types are specified, show a message
+            TextView noBloodTypesText = new TextView(requireContext());
+            noBloodTypesText.setText("No specific blood types specified");
+            noBloodTypesText.setTextColor(Color.GRAY);
+            bloodTypeChipGroup.addView(noBloodTypesText);
+        }
+    }
+
     private String formatTime(String time) {
         try {
             SimpleDateFormat input = new SimpleDateFormat("HH:mm", Locale.getDefault());
@@ -179,4 +205,5 @@ public class SiteDetailFragment extends Fragment {
             return time;
         }
     }
+
 }

@@ -1,5 +1,6 @@
 package com.example.blooddono.fragments;
 
+import android.graphics.Color;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
@@ -16,6 +17,9 @@ import android.widget.ProgressBar;
 import com.example.blooddono.R;
 import com.example.blooddono.models.DonationSite;
 import com.example.blooddono.repositories.DonationSiteRepository;
+import com.google.android.material.chip.Chip;
+import com.google.android.material.chip.ChipGroup;
+
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
@@ -186,6 +190,20 @@ public class DiscoverFragment extends Fragment {
                     getResources().getColor(android.R.color.holo_green_dark) :
                     getResources().getColor(android.R.color.holo_red_dark);
             holder.statusText.setTextColor(color);
+
+            // Add blood types
+            holder.bloodTypeChipGroup.removeAllViews();
+            if (site.getNeededBloodTypes() != null && !site.getNeededBloodTypes().isEmpty()) {
+                for (String bloodType : site.getNeededBloodTypes()) {
+                    Chip chip = new Chip(holder.itemView.getContext());
+                    chip.setText(bloodType);
+                    chip.setClickable(false);
+                    chip.setChipBackgroundColorResource(R.color.design_default_color_primary);
+                    chip.setTextColor(Color.WHITE);
+                    holder.bloodTypeChipGroup.addView(chip);
+                }
+            }
+
         }
 
         @Override
@@ -203,6 +221,7 @@ public class DiscoverFragment extends Fragment {
             TextView descriptionText;
             TextView addressText;
             TextView statusText;
+            ChipGroup bloodTypeChipGroup;
 
             SiteViewHolder(View itemView) {
                 super(itemView);
@@ -210,6 +229,7 @@ public class DiscoverFragment extends Fragment {
                 descriptionText = itemView.findViewById(R.id.descriptionText);
                 addressText = itemView.findViewById(R.id.addressText);
                 statusText = itemView.findViewById(R.id.statusText);
+                bloodTypeChipGroup = itemView.findViewById(R.id.bloodTypeChipGroup);
 
                 itemView.setOnClickListener(v -> {
                     DonationSite site = sites.get(getAdapterPosition());
