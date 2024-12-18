@@ -89,6 +89,13 @@ public class SiteDetailFragment extends Fragment {
 
         // Setup donations RecyclerView
         donationsAdapter = new DonationsAdapter(requireContext());
+        donationsAdapter.setOnDonationStatusChangedListener(() -> {
+            // Reload donations when status changes
+            String siteId = getArguments().getString("siteId");
+            if (siteId != null) {
+                loadDonations(siteId);
+            }
+        });
         donationsRecyclerView.setLayoutManager(new LinearLayoutManager(requireContext()));
         donationsRecyclerView.setAdapter(donationsAdapter);
 
@@ -314,9 +321,14 @@ public class SiteDetailFragment extends Fragment {
     }
 
     private void loadDonations(String siteId) {
+        ProgressDialog progressDialog = new ProgressDialog(requireContext());
+        progressDialog.setMessage("Refreshing donations...");
+        progressDialog.show();
+
         donationRepository.getDonationsBySite(siteId, new DonationRepository.OnCompleteListener<List<Donation>>() {
             @Override
             public void onSuccess(List<Donation> donations) {
+                progressDialog.dismiss();
                 if (donations.isEmpty()) {
                     noDonationsText.setVisibility(View.VISIBLE);
                     donationsRecyclerView.setVisibility(View.GONE);
@@ -329,6 +341,7 @@ public class SiteDetailFragment extends Fragment {
 
             @Override
             public void onError(Exception e) {
+                progressDialog.dismiss();
                 Log.e("SiteDetailFragment", e.getMessage());
                 Toast.makeText(requireContext(),
                         "Error loading donations: " + e.getMessage(),
