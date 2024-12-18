@@ -12,6 +12,7 @@ public class Donation {
     private String donorName;
     private String siteId;
     private String siteName;
+    private String driveId;
     private List<String> bloodTypes;
     private String status;
     private long createdAt;
@@ -56,4 +57,6 @@ public class Donation {
     public Map<String, Double> getCollectedAmounts() {
         return collectedAmounts;
     }
+    public String getDriveId() { return driveId; }
+    public void setDriveId(String driveId) { this.driveId = driveId; }
 }

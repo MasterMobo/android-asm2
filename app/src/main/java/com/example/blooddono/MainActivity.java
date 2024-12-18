@@ -2,13 +2,16 @@ package com.example.blooddono;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.util.Log;
 import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.navigation.NavController;
 import androidx.navigation.fragment.NavHostFragment;
 import androidx.navigation.ui.NavigationUI;
 import com.example.blooddono.activities.LoginActivity;
+import com.example.blooddono.models.DonationDrive;
 import com.example.blooddono.models.User;
+import com.example.blooddono.repositories.DonationDriveRepository;
 import com.example.blooddono.repositories.UserRepository;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.firebase.auth.FirebaseAuth;
@@ -19,11 +22,30 @@ public class MainActivity extends AppCompatActivity {
     private NavController navController;
     private FirebaseAuth mAuth;
     private UserRepository userRepository;
+    private DonationDriveRepository driveRepository;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+
+        // Initialize repositories
+        driveRepository = new DonationDriveRepository();
+
+        // Ensure active drive exists
+        driveRepository.ensureActiveDriveExists(new DonationDriveRepository.OnCompleteListener<DonationDrive>() {
+            @Override
+            public void onSuccess(DonationDrive drive) {
+                // Drive exists or was created successfully
+                Log.d("MainActivity", "Active drive ensured: " + drive.getName());
+            }
+
+            @Override
+            public void onError(Exception e) {
+                Log.e("MainActivity", "Error ensuring active drive: " + e.getMessage());
+            }
+        });
 
         // Initialize Firebase and repository
         mAuth = FirebaseAuth.getInstance();

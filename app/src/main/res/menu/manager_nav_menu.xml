@@ -5,6 +5,10 @@
         android:icon="@android:drawable/ic_menu_sort_by_size"
         android:title="My Sites" />
     <item
+        android:id="@+id/donationDrivesFragment"
+        android:icon="@android:drawable/ic_menu_today"
+        android:title="Donation Drives" />
+    <item
         android:id="@+id/sitesMapFragment"
         android:icon="@android:drawable/ic_dialog_map"
         android:title="Map" />

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="sort_options">
+        <item>Date (Newest First)</item>
+        <item>Date (Oldest First)</item>
+        <item>Status</item>
+        <item>Donor Name</item>
+    </string-array>
+</resources>

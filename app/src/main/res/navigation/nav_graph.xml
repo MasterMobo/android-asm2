@@ -53,4 +53,21 @@
             app:argType="string" />
     </fragment>
 
+    <fragment
+        android:id="@+id/donationDrivesFragment"
+        android:name="com.example.blooddono.fragments.DonationDrivesFragment"
+        android:label="Donation Drives">
+        <action
+            android:id="@+id/action_donationDrivesFragment_to_driveDetailFragment"
+            app:destination="@id/driveDetailFragment" />
+    </fragment>
+
+    <fragment
+        android:id="@+id/driveDetailFragment"
+        android:name="com.example.blooddono.fragments.DriveDetailFragment"
+        android:label="Drive Details">
+        <argument
+            android:name="driveId"
+            app:argType="string" />
+    </fragment>
 </navigation>
