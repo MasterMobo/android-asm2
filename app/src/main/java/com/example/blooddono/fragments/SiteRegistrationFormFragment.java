@@ -355,9 +355,9 @@ public class SiteRegistrationFormFragment extends Fragment {
                 .setPositiveButton("OK", (dialog, which) -> {
                     // Clear form
                     clearForm();
-                    // Navigate back
+                    // Navigate back to My Sites fragment
                     NavController navController = Navigation.findNavController(requireView());
-                    navController.navigate(R.id.sitesMapFragment);
+                    navController.navigate(R.id.mySitesFragment);
                 })
                 .show();
     }

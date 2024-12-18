@@ -28,6 +28,7 @@ import android.util.Log;
 public class RegisterActivity extends AppCompatActivity {
     private static final String TAG = "RegisterActivity";
     private EditText emailInput;
+    private EditText fullNameInput;
     private EditText passwordInput;
     private EditText confirmPasswordInput;
     private RadioGroup roleRadioGroup;
@@ -47,6 +48,7 @@ public class RegisterActivity extends AppCompatActivity {
 
         // Initialize views
         emailInput = findViewById(R.id.emailInput);
+        fullNameInput = findViewById(R.id.fullNameInput);
         passwordInput = findViewById(R.id.passwordInput);
         confirmPasswordInput = findViewById(R.id.confirmPasswordInput);
         roleRadioGroup = findViewById(R.id.roleRadioGroup);
@@ -60,6 +62,7 @@ public class RegisterActivity extends AppCompatActivity {
 
     private void handleRegister() {
         String email = emailInput.getText().toString().trim();
+        String fullName = fullNameInput.getText().toString().trim();
         String password = passwordInput.getText().toString().trim();
         String confirmPassword = confirmPasswordInput.getText().toString().trim();
 
@@ -74,6 +77,11 @@ public class RegisterActivity extends AppCompatActivity {
         // Validate inputs
         if (email.isEmpty()) {
             emailInput.setError("Email is required");
+            return;
+        }
+
+        if (fullName.isEmpty()) {
+            fullNameInput.setError("Full name is required");
             return;
         }
 
@@ -103,7 +111,7 @@ public class RegisterActivity extends AppCompatActivity {
                     if (task.isSuccessful()) {
                         // Create user in Firestore
                         FirebaseUser firebaseUser = mAuth.getCurrentUser();
-                        User user = new User(firebaseUser.getUid(), email, role);
+                        User user = new User(firebaseUser.getUid(), email, fullName, role);
 
                         userRepository.createUser(user, new UserRepository.OnCompleteListener<Void>() {
                             @Override
@@ -124,7 +132,6 @@ public class RegisterActivity extends AppCompatActivity {
                             @Override
                             public void onError(Exception e) {
                                 progressDialog.dismiss();
-                                // Show error dialog
                                 new AlertDialog.Builder(RegisterActivity.this)
                                         .setTitle("Error")
                                         .setMessage("Failed to create user profile: " + e.getMessage())
@@ -134,20 +141,25 @@ public class RegisterActivity extends AppCompatActivity {
                         });
                     } else {
                         progressDialog.dismiss();
+                        // Handle specific registration errors
+                        String errorMessage;
+                        if (task.getException() instanceof FirebaseAuthWeakPasswordException) {
+                            errorMessage = "Password is too weak. Please choose a stronger password.";
+                        } else if (task.getException() instanceof FirebaseAuthInvalidCredentialsException) {
+                            errorMessage = "Invalid email format. Please enter a valid email address.";
+                        } else if (task.getException() instanceof FirebaseAuthUserCollisionException) {
+                            errorMessage = "An account already exists with this email address.";
+                        } else if (task.getException() instanceof FirebaseNetworkException) {
+                            errorMessage = "Network error. Please check your internet connection and try again.";
+                        } else {
+                            errorMessage = "Registration failed. Please try again later.";
+                        }
 
-                        Button clearButton = new Button(this);
-                        clearButton.setText("Clear Firebase");
-                        clearButton.setOnClickListener(v -> {
-                            FirebaseAuth.getInstance().signOut();
-                            // Clear all data
-                            getApplicationContext().deleteDatabase("firebase-installations.db");
-                            getApplicationContext().deleteDatabase("firebase-installations-store");
-                            // Restart app
-                            Intent intent = new Intent(this, LoginActivity.class);
-                            intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-                            startActivity(intent);
-                            finish();
-                        });
+                        new AlertDialog.Builder(RegisterActivity.this)
+                                .setTitle("Registration Failed")
+                                .setMessage(errorMessage)
+                                .setPositiveButton("OK", null)
+                                .show();
                     }
                 });
     }

@@ -103,7 +103,7 @@ public class SiteDetailFragment extends Fragment {
         userRepository.getUser(ownerId, new UserRepository.OnCompleteListener<User>() {
             @Override
             public void onSuccess(User user) {
-                ownerNameText.setText(user.getEmail()); // Using email as name for now
+                ownerNameText.setText(user.getFullName());
             }
 
             @Override
