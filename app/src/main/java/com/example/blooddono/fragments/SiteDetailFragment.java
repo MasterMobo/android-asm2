@@ -1,5 +1,6 @@
 package com.example.blooddono.fragments;
 
+import android.app.ProgressDialog;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.util.Log;
@@ -10,17 +11,23 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.appcompat.app.AlertDialog;
 import androidx.fragment.app.Fragment;
 
 import com.example.blooddono.R;
+import com.example.blooddono.dialogs.BloodTypeSelectionDialog;
 import com.example.blooddono.models.DayHours;
+import com.example.blooddono.models.Donation;
 import com.example.blooddono.models.DonationSite;
 import com.example.blooddono.models.User;
+import com.example.blooddono.repositories.DonationRepository;
 import com.example.blooddono.repositories.DonationSiteRepository;
 import com.example.blooddono.repositories.UserRepository;
+import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
+import com.google.firebase.auth.FirebaseAuth;
 
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -34,12 +41,15 @@ public class SiteDetailFragment extends Fragment {
     private TextView addressText;
     private DonationSiteRepository siteRepository;
     private UserRepository userRepository;
+    private DonationRepository donationRepository;
     private TextView availabilityText;
     private TextView hoursTypeText;
     private LinearLayout operatingHoursLayout;
     private MaterialCardView datesCard;
     private MaterialCardView hoursCard;
     private ChipGroup bloodTypeChipGroup;
+    private MaterialButton donateButton;
+    private DonationSite currentSite;
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
@@ -53,6 +63,7 @@ public class SiteDetailFragment extends Fragment {
         // Initialize repositories
         siteRepository = new DonationSiteRepository();
         userRepository = new UserRepository();
+        donationRepository = new DonationRepository();
 
         // Initialize views
         ownerNameText = view.findViewById(R.id.ownerNameText);
@@ -65,18 +76,39 @@ public class SiteDetailFragment extends Fragment {
         datesCard = view.findViewById(R.id.datesCard);
         hoursCard = view.findViewById(R.id.hoursCard);
         bloodTypeChipGroup = view.findViewById(R.id.bloodTypeChipGroup);
+        donateButton = view.findViewById(R.id.donateButton);
 
-        // Get site ID from arguments
+        // Get site ID from arguments and load details
         String siteId = getArguments().getString("siteId");
         if (siteId != null) {
             loadSiteDetails(siteId);
         }
+
+        // Check if user is a donor and show/hide donate button accordingly
+        String currentUserId = FirebaseAuth.getInstance().getCurrentUser().getUid();
+        userRepository.getUser(currentUserId, new UserRepository.OnCompleteListener<User>() {
+            @Override
+            public void onSuccess(User user) {
+                if (User.ROLE_DONOR.equals(user.getRole())) {
+                    donateButton.setVisibility(View.VISIBLE);
+                    donateButton.setOnClickListener(v -> handleDonation(user));
+                } else {
+                    donateButton.setVisibility(View.GONE);
+                }
+            }
+
+            @Override
+            public void onError(Exception e) {
+                donateButton.setVisibility(View.GONE);
+            }
+        });
     }
 
     private void loadSiteDetails(String siteId) {
         siteRepository.getDonationSite(siteId, new DonationSiteRepository.OnCompleteListener<DonationSite>() {
             @Override
             public void onSuccess(DonationSite site) {
+                currentSite = site;
                 // Set site details
                 siteNameText.setText(site.getName());
                 descriptionText.setText(site.getDescription());
@@ -103,7 +135,7 @@ public class SiteDetailFragment extends Fragment {
         userRepository.getUser(ownerId, new UserRepository.OnCompleteListener<User>() {
             @Override
             public void onSuccess(User user) {
-                ownerNameText.setText(user.getFullName());
+                ownerNameText.setText(user.getFullName()); // Now using full name instead of email
             }
 
             @Override
@@ -112,6 +144,63 @@ public class SiteDetailFragment extends Fragment {
                 ownerNameText.setText("Unknown Owner");
             }
         });
+    }
+
+    private void handleDonation(User donor) {
+        if (currentSite == null) return;
+
+        // Create and show blood type selection dialog
+        BloodTypeSelectionDialog dialog = new BloodTypeSelectionDialog(
+                requireContext(),
+                currentSite.getNeededBloodTypes(),
+                selectedBloodTypes -> {
+                    // Create donation record
+                    Donation donation = new Donation(
+                            donor.getUid(),
+                            donor.getFullName(),
+                            currentSite.getId(),
+                            currentSite.getName(),
+                            selectedBloodTypes
+                    );
+
+                    // Show loading dialog
+                    ProgressDialog progressDialog = new ProgressDialog(requireContext());
+                    progressDialog.setMessage("Registering donation...");
+                    progressDialog.show();
+
+                    // Save donation to Firebase
+                    donationRepository.createDonation(donation, new DonationRepository.OnCompleteListener<String>() {
+                        @Override
+                        public void onSuccess(String donationId) {
+                            progressDialog.dismiss();
+                            showSuccessDialog();
+                        }
+
+                        @Override
+                        public void onError(Exception e) {
+                            progressDialog.dismiss();
+                            showErrorDialog(e.getMessage());
+                        }
+                    });
+                }
+        );
+        dialog.show();
+    }
+
+    private void showSuccessDialog() {
+        new AlertDialog.Builder(requireContext())
+                .setTitle("Success")
+                .setMessage("Your donation registration has been submitted successfully!")
+                .setPositiveButton("OK", null)
+                .show();
+    }
+
+    private void showErrorDialog(String message) {
+        new AlertDialog.Builder(requireContext())
+                .setTitle("Error")
+                .setMessage("Failed to register donation: " + message)
+                .setPositiveButton("OK", null)
+                .show();
     }
 
     private void displayAvailability(DonationSite site) {
@@ -175,7 +264,6 @@ public class SiteDetailFragment extends Fragment {
     }
 
     private void displayBloodTypes(DonationSite site) {
-        // Display blood types
         bloodTypeChipGroup.removeAllViews();
         if (site.getNeededBloodTypes() != null && !site.getNeededBloodTypes().isEmpty()) {
             for (String bloodType : site.getNeededBloodTypes()) {
@@ -187,7 +275,6 @@ public class SiteDetailFragment extends Fragment {
                 bloodTypeChipGroup.addView(chip);
             }
         } else {
-            // If no blood types are specified, show a message
             TextView noBloodTypesText = new TextView(requireContext());
             noBloodTypesText.setText("No specific blood types specified");
             noBloodTypesText.setTextColor(Color.GRAY);
@@ -205,5 +292,4 @@ public class SiteDetailFragment extends Fragment {
             return time;
         }
     }
-
 }

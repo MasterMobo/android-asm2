@@ -230,6 +230,15 @@
 
         </com.google.android.material.card.MaterialCardView>
 
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/donateButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:text="Register to Donate"
+            android:visibility="gone"
+            style="@style/Widget.MaterialComponents.Button"/>
+
     </LinearLayout>
 
 </ScrollView>
