@@ -5,7 +5,9 @@ import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.Query;
 import com.google.firebase.firestore.QuerySnapshot;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class DonationRepository {
     private static final String COLLECTION_NAME = "donations";
@@ -47,7 +49,6 @@ public class DonationRepository {
     public void getDonationsByDonor(String donorId, OnCompleteListener<List<Donation>> listener) {
         db.collection(COLLECTION_NAME)
                 .whereEqualTo("donorId", donorId)
-                .orderBy("createdAt", Query.Direction.DESCENDING)
                 .get()
                 .addOnSuccessListener(queryDocumentSnapshots -> {
                     List<Donation> donations = new ArrayList<>();
@@ -60,13 +61,18 @@ public class DonationRepository {
                 .addOnFailureListener(listener::onError);
     }
 
-    public void updateDonationStatus(String donationId, String status, OnCompleteListener<Void> listener) {
+    public void updateDonationStatus(String donationId, String status,
+                                     Map<String, Double> collectedAmounts,
+                                     OnCompleteListener<Void> listener) {
+        Map<String, Object> updates = new HashMap<>();
+        updates.put("status", status);
+        updates.put("completedAt", status.equals(Donation.STATUS_COMPLETED) ?
+                System.currentTimeMillis() : null);
+        updates.put("collectedAmounts", collectedAmounts);
+
         db.collection(COLLECTION_NAME)
                 .document(donationId)
-                .update(
-                        "status", status,
-                        "completedAt", status.equals(Donation.STATUS_COMPLETED) ? System.currentTimeMillis() : null
-                )
+                .update(updates)
                 .addOnSuccessListener(aVoid -> listener.onSuccess(null))
                 .addOnFailureListener(listener::onError);
     }

@@ -1,6 +1,7 @@
 package com.example.blooddono.models;
 
 import java.util.List;
+import java.util.Map;
 
 public class Donation {
     public static final String STATUS_PENDING = "pending";
@@ -15,6 +16,7 @@ public class Donation {
     private String status;
     private long createdAt;
     private long completedAt;
+    private Map<String, Double> collectedAmounts;
 
     public Donation() {
         // Required empty constructor for Firebase
@@ -50,4 +52,8 @@ public class Donation {
     public void setCreatedAt(long createdAt) { this.createdAt = createdAt; }
     public long getCompletedAt() { return completedAt; }
     public void setCompletedAt(long completedAt) { this.completedAt = completedAt; }
+
+    public Map<String, Double> getCollectedAmounts() {
+        return collectedAmounts;
+    }
 }

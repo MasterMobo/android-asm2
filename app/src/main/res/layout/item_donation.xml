@@ -53,6 +53,23 @@
             android:textColor="?android:textColorSecondary"
             android:layout_marginTop="8dp"/>
 
+        <!-- Add inside the LinearLayout after existing views -->
+        <Button
+            android:id="@+id/confirmButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Confirm"
+            android:visibility="gone"
+            style="@style/Widget.MaterialComponents.Button"/>
+
+        <TextView
+            android:id="@+id/collectedAmountsText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="14sp"
+            android:visibility="gone"
+            android:layout_marginTop="8dp"/>
+
     </LinearLayout>
 
 </com.google.android.material.card.MaterialCardView>

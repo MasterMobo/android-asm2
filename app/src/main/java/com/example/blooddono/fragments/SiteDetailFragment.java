@@ -98,25 +98,6 @@ public class SiteDetailFragment extends Fragment {
             loadSiteDetails(siteId);
             loadDonations(siteId);
         }
-
-        // Check if user is a donor and show/hide donate button accordingly
-        String currentUserId = FirebaseAuth.getInstance().getCurrentUser().getUid();
-        userRepository.getUser(currentUserId, new UserRepository.OnCompleteListener<User>() {
-            @Override
-            public void onSuccess(User user) {
-                if (User.ROLE_DONOR.equals(user.getRole())) {
-                    donateButton.setVisibility(View.VISIBLE);
-                    donateButton.setOnClickListener(v -> handleDonation(user));
-                } else {
-                    donateButton.setVisibility(View.GONE);
-                }
-            }
-
-            @Override
-            public void onError(Exception e) {
-                donateButton.setVisibility(View.GONE);
-            }
-        });
     }
 
     private void loadSiteDetails(String siteId) {
@@ -135,6 +116,22 @@ public class SiteDetailFragment extends Fragment {
 
                 // Load owner details
                 loadOwnerDetails(site.getOwnerId());
+
+                // Check if current user is the site owner
+                String currentUserId = FirebaseAuth.getInstance().getCurrentUser().getUid();
+                userRepository.getUser(currentUserId, new UserRepository.OnCompleteListener<User>() {
+                    @Override
+                    public void onSuccess(User user) {
+                        boolean isOwner = user.getUid().equals(site.getOwnerId());
+                        donationsAdapter.setShowConfirmButton(isOwner);
+                    }
+
+                    @Override
+                    public void onError(Exception e) {
+                        // Handle error if needed
+                        donationsAdapter.setShowConfirmButton(false);
+                    }
+                });
             }
 
             @Override
@@ -145,7 +142,6 @@ public class SiteDetailFragment extends Fragment {
             }
         });
     }
-
     private void loadOwnerDetails(String ownerId) {
         userRepository.getUser(ownerId, new UserRepository.OnCompleteListener<User>() {
             @Override
