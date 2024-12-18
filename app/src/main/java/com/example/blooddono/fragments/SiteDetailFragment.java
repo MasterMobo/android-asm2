@@ -124,6 +124,13 @@ public class SiteDetailFragment extends Fragment {
                     public void onSuccess(User user) {
                         boolean isOwner = user.getUid().equals(site.getOwnerId());
                         donationsAdapter.setShowConfirmButton(isOwner);
+
+                        if (User.ROLE_DONOR.equals(user.getRole())) {
+                            donateButton.setVisibility(View.VISIBLE);
+                            donateButton.setOnClickListener(v -> handleDonation(user));
+                        } else {
+                            donateButton.setVisibility(View.GONE);
+                        }
                     }
 
                     @Override
