@@ -30,7 +30,6 @@ public class DonationRepository {
     public void getDonationsBySite(String siteId, OnCompleteListener<List<Donation>> listener) {
         db.collection(COLLECTION_NAME)
                 .whereEqualTo("siteId", siteId)
-                .orderBy("createdAt", Query.Direction.DESCENDING)
                 .get()
                 .addOnSuccessListener(queryDocumentSnapshots -> {
                     List<Donation> donations = new ArrayList<>();
@@ -38,6 +37,8 @@ public class DonationRepository {
                         Donation donation = doc.toObject(Donation.class);
                         donations.add(donation);
                     }
+                    // Sort the list in memory instead
+                    donations.sort((a, b) -> Long.compare(b.getCreatedAt(), a.getCreatedAt()));
                     listener.onSuccess(donations);
                 })
                 .addOnFailureListener(listener::onError);

@@ -13,8 +13,11 @@ import android.widget.Toast;
 
 import androidx.appcompat.app.AlertDialog;
 import androidx.fragment.app.Fragment;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.blooddono.R;
+import com.example.blooddono.adapters.DonationsAdapter;
 import com.example.blooddono.dialogs.BloodTypeSelectionDialog;
 import com.example.blooddono.models.DayHours;
 import com.example.blooddono.models.Donation;
@@ -32,6 +35,7 @@ import com.google.firebase.auth.FirebaseAuth;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.List;
 import java.util.Locale;
 
 public class SiteDetailFragment extends Fragment {
@@ -50,6 +54,9 @@ public class SiteDetailFragment extends Fragment {
     private ChipGroup bloodTypeChipGroup;
     private MaterialButton donateButton;
     private DonationSite currentSite;
+    private RecyclerView donationsRecyclerView;
+    private TextView noDonationsText;
+    private DonationsAdapter donationsAdapter;
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
@@ -77,11 +84,19 @@ public class SiteDetailFragment extends Fragment {
         hoursCard = view.findViewById(R.id.hoursCard);
         bloodTypeChipGroup = view.findViewById(R.id.bloodTypeChipGroup);
         donateButton = view.findViewById(R.id.donateButton);
+        donationsRecyclerView = view.findViewById(R.id.donationsRecyclerView);
+        noDonationsText = view.findViewById(R.id.noDonationsText);
+
+        // Setup donations RecyclerView
+        donationsAdapter = new DonationsAdapter(requireContext());
+        donationsRecyclerView.setLayoutManager(new LinearLayoutManager(requireContext()));
+        donationsRecyclerView.setAdapter(donationsAdapter);
 
         // Get site ID from arguments and load details
         String siteId = getArguments().getString("siteId");
         if (siteId != null) {
             loadSiteDetails(siteId);
+            loadDonations(siteId);
         }
 
         // Check if user is a donor and show/hide donate button accordingly
@@ -174,6 +189,8 @@ public class SiteDetailFragment extends Fragment {
                         public void onSuccess(String donationId) {
                             progressDialog.dismiss();
                             showSuccessDialog();
+                            // Reload donations to show the new one
+                            loadDonations(currentSite.getId());
                         }
 
                         @Override
@@ -291,5 +308,31 @@ public class SiteDetailFragment extends Fragment {
         } catch (ParseException e) {
             return time;
         }
+    }
+
+    private void loadDonations(String siteId) {
+        donationRepository.getDonationsBySite(siteId, new DonationRepository.OnCompleteListener<List<Donation>>() {
+            @Override
+            public void onSuccess(List<Donation> donations) {
+                if (donations.isEmpty()) {
+                    noDonationsText.setVisibility(View.VISIBLE);
+                    donationsRecyclerView.setVisibility(View.GONE);
+                } else {
+                    noDonationsText.setVisibility(View.GONE);
+                    donationsRecyclerView.setVisibility(View.VISIBLE);
+                    donationsAdapter.setDonations(donations);
+                }
+            }
+
+            @Override
+            public void onError(Exception e) {
+                Log.e("SiteDetailFragment", e.getMessage());
+                Toast.makeText(requireContext(),
+                        "Error loading donations: " + e.getMessage(),
+                        Toast.LENGTH_SHORT).show();
+                noDonationsText.setVisibility(View.VISIBLE);
+                donationsRecyclerView.setVisibility(View.GONE);
+            }
+        });
     }
 }
