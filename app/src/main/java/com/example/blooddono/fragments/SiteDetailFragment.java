@@ -38,6 +38,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class SiteDetailFragment extends Fragment {
     private TextView ownerNameText;
@@ -59,6 +60,7 @@ public class SiteDetailFragment extends Fragment {
     private TextView noDonationsText;
     private DonationsAdapter donationsAdapter;
     private MaterialButton volunteerButton;
+    private TextView volunteersText;
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
@@ -89,6 +91,7 @@ public class SiteDetailFragment extends Fragment {
         donationsRecyclerView = view.findViewById(R.id.donationsRecyclerView);
         noDonationsText = view.findViewById(R.id.noDonationsText);
         volunteerButton = view.findViewById(R.id.volunteerButton);
+        volunteersText = view.findViewById(R.id.volunteersText);
 
         // Setup donations RecyclerView
         donationsAdapter = new DonationsAdapter(requireContext());
@@ -123,6 +126,7 @@ public class SiteDetailFragment extends Fragment {
                 displayAvailability(site);
                 displayOperatingHours(site);
                 displayBloodTypes(site);
+                displayVolunteers(site.getVolunteerIds());
 
                 // Load owner details
                 loadOwnerDetails(site.getOwnerId());
@@ -368,7 +372,37 @@ public class SiteDetailFragment extends Fragment {
         });
     }
 
+    private void displayVolunteers(List<String> volunteerIds) {
+        if (volunteerIds == null || volunteerIds.isEmpty()) {
+            volunteersText.setVisibility(View.VISIBLE);
+            volunteersText.setText("No volunteers yet");
+            return;
+        }
 
+        StringBuilder volunteerNames = new StringBuilder();
+        AtomicInteger counter = new AtomicInteger(volunteerIds.size());
+
+        for (String volunteerId : volunteerIds) {
+            userRepository.getUser(volunteerId, new UserRepository.OnCompleteListener<User>() {
+                @Override
+                public void onSuccess(User user) {
+                    volunteerNames.append(user.getFullName()).append("\n");
+                    if (counter.decrementAndGet() == 0) {
+                        volunteersText.setText(volunteerNames.toString());
+                        volunteersText.setVisibility(View.VISIBLE);
+                    }
+                }
+
+                @Override
+                public void onError(Exception e) {
+                    if (counter.decrementAndGet() == 0) {
+                        volunteersText.setText(volunteerNames.toString());
+                        volunteersText.setVisibility(View.VISIBLE);
+                    }
+                }
+            });
+        }
+    }
 
     private void handleVolunteer() {
         String currentUserId = FirebaseAuth.getInstance().getCurrentUser().getUid();
