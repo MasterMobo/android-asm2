@@ -12,6 +12,7 @@ public class DonationDrive {
     private Map<String, Double> totalCollectedAmounts; // Blood type -> Total amount
     private int totalSites;
     private int totalDonations;
+    private long completedAt;
 
     public DonationDrive() {
         // Required empty constructor for Firebase
@@ -47,5 +48,7 @@ public class DonationDrive {
     public void setTotalSites(int totalSites) { this.totalSites = totalSites; }
     public int getTotalDonations() { return totalDonations; }
     public void setTotalDonations(int totalDonations) { this.totalDonations = totalDonations; }
+    public long getCompletedAt() { return completedAt; }
+    public void setCompletedAt(long completedAt) { this.completedAt = completedAt; }
 }
 

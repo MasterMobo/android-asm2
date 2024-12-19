@@ -156,6 +156,44 @@ public class DonationDriveRepository {
         });
     }
 
+    public void completeDrive(String driveId, OnCompleteListener<Void> listener) {
+        // First deactivate the current drive
+        db.collection(COLLECTION_NAME)
+                .document(driveId)
+                .update("active", false,
+                        "completedAt", System.currentTimeMillis())
+                .addOnSuccessListener(aVoid -> {
+                    // Then create a new drive
+                    createDefaultDrive(new OnCompleteListener<DonationDrive>() {
+                        @Override
+                        public void onSuccess(DonationDrive drive) {
+                            listener.onSuccess(null);
+                        }
+
+                        @Override
+                        public void onError(Exception e) {
+                            listener.onError(e);
+                        }
+                    });
+                })
+                .addOnFailureListener(listener::onError);
+    }
+
+    public void getPastDrives(OnCompleteListener<List<DonationDrive>> listener) {
+        db.collection(COLLECTION_NAME)
+                .whereEqualTo("active", false)
+                .get()
+                .addOnSuccessListener(querySnapshot -> {
+                    List<DonationDrive> drives = new ArrayList<>();
+                    for (var doc : querySnapshot) {
+                        DonationDrive drive = doc.toObject(DonationDrive.class);
+                        drive.setId(doc.getId());
+                        drives.add(drive);
+                    }
+                    listener.onSuccess(drives);
+                })
+                .addOnFailureListener(listener::onError);    }
+
     public interface OnCompleteListener<T> {
         void onSuccess(T result);
         void onError(Exception e);
