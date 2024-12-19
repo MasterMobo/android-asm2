@@ -47,6 +47,14 @@
                 android:layout_height="wrap_content"
                 android:textSize="16sp"/>
 
+            <Button
+            android:id="@+id/completeCurrentDriveButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Complete Drive"
+            style="@style/Widget.MaterialComponents.Button"/>
+
+
         </LinearLayout>
 
     </com.google.android.material.card.MaterialCardView>

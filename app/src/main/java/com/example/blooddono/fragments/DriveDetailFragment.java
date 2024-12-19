@@ -8,11 +8,14 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
+import android.widget.Button;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.appcompat.app.AlertDialog;
 import androidx.fragment.app.Fragment;
+import androidx.navigation.Navigation;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import com.example.blooddono.R;
@@ -46,6 +49,7 @@ public class DriveDetailFragment extends Fragment {
     private DonationsAdapter donationsAdapter;
     private List<Donation> allDonations = new ArrayList<>();
     private DonationDrive currentDrive;
+    private Button completeCurrentDriveButton;
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
@@ -70,12 +74,23 @@ public class DriveDetailFragment extends Fragment {
         emptyStateText = view.findViewById(R.id.emptyStateText);
         sortSpinner = view.findViewById(R.id.sortSpinner);
         bloodTypeFilterSpinner = view.findViewById(R.id.bloodTypeFilterSpinner);
+        completeCurrentDriveButton = view.findViewById(R.id.completeCurrentDriveButton);
+
+        completeCurrentDriveButton.setOnClickListener(v -> handleCompleteCurrentDrive());
 
         // Setup RecyclerView
         donationsAdapter = new DonationsAdapter(requireContext());
         donationsRecyclerView.setLayoutManager(new LinearLayoutManager(requireContext()));
         donationsRecyclerView.setAdapter(donationsAdapter);
         donationsAdapter.setShowConfirmButton(true);
+        donationsAdapter.setOnDonationStatusChangedListener(() -> {
+            // Reload both drive details and donations when status changes
+            String driveId = getArguments().getString("driveId");
+            if (driveId != null) {
+                loadDriveDetails(driveId);
+                loadDonations(driveId);
+            }
+        });
 
         // Setup spinners
         setupSpinners();
@@ -180,6 +195,9 @@ public class DriveDetailFragment extends Fragment {
                     entry.getKey(), entry.getValue()));
         }
         bloodTypeSummaryText.setText(summary.toString());
+
+        // Show/hide complete button based on drive status
+        completeCurrentDriveButton.setVisibility(drive.isActive() ? View.VISIBLE : View.GONE);
     }
 
     private void loadDonations(String driveId) {
@@ -269,5 +287,43 @@ public class DriveDetailFragment extends Fragment {
                 donationsRecyclerView.setVisibility(View.VISIBLE);
             }
         }
+    }
+
+    private void handleCompleteCurrentDrive() {
+        if (currentDrive == null) return;
+
+        new AlertDialog.Builder(requireContext())
+                .setTitle("Complete Drive")
+                .setMessage("Are you sure you want to complete the current drive? " +
+                        "This will create a new drive automatically.")
+                .setPositiveButton("Complete", (dialog, which) -> {
+                    ProgressDialog progressDialog = new ProgressDialog(requireContext());
+                    progressDialog.setMessage("Completing drive...");
+                    progressDialog.show();
+
+                    driveRepository.completeDrive(currentDrive.getId(),
+                            new DonationDriveRepository.OnCompleteListener<Void>() {
+                                @Override
+                                public void onSuccess(Void result) {
+                                    progressDialog.dismiss();
+                                    Toast.makeText(requireContext(),
+                                            "Drive completed successfully",
+                                            Toast.LENGTH_SHORT).show();
+                                    // Navigate back to donation drives
+                                    Navigation.findNavController(requireView())
+                                            .navigate(R.id.donationDrivesFragment);
+                                }
+
+                                @Override
+                                public void onError(Exception e) {
+                                    progressDialog.dismiss();
+                                    Toast.makeText(requireContext(),
+                                            "Error completing drive: " + e.getMessage(),
+                                            Toast.LENGTH_SHORT).show();
+                                }
+                            });
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
     }
 }
