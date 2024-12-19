@@ -1,6 +1,8 @@
 package com.example.blooddono.fragments;
 
+import android.app.ProgressDialog;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -14,7 +16,7 @@ import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import com.example.blooddono.R;
-import com.example.blooddono.adapters.DriveDonationsAdapter;
+import com.example.blooddono.adapters.DonationsAdapter;
 import com.example.blooddono.models.Donation;
 import com.example.blooddono.models.DonationDrive;
 import com.example.blooddono.repositories.DonationDriveRepository;
@@ -41,7 +43,7 @@ public class DriveDetailFragment extends Fragment {
     private Spinner bloodTypeFilterSpinner;
     private DonationDriveRepository driveRepository;
     private DonationRepository donationRepository;
-    private DriveDonationsAdapter donationsAdapter;
+    private DonationsAdapter donationsAdapter;
     private List<Donation> allDonations = new ArrayList<>();
     private DonationDrive currentDrive;
 
@@ -70,9 +72,10 @@ public class DriveDetailFragment extends Fragment {
         bloodTypeFilterSpinner = view.findViewById(R.id.bloodTypeFilterSpinner);
 
         // Setup RecyclerView
-        donationsAdapter = new DriveDonationsAdapter(requireContext());
+        donationsAdapter = new DonationsAdapter(requireContext());
         donationsRecyclerView.setLayoutManager(new LinearLayoutManager(requireContext()));
         donationsRecyclerView.setAdapter(donationsAdapter);
+        donationsAdapter.setShowConfirmButton(true);
 
         // Setup spinners
         setupSpinners();
@@ -82,7 +85,9 @@ public class DriveDetailFragment extends Fragment {
         if (driveId != null) {
             loadDriveDetails(driveId);
             loadDriveDonations(driveId);
+            loadDonations(driveId);
         }
+
     }
 
     private void setupSpinners() {
@@ -177,10 +182,43 @@ public class DriveDetailFragment extends Fragment {
         bloodTypeSummaryText.setText(summary.toString());
     }
 
-    private void applySortAndFilter() {
-        if (allDonations.isEmpty()) return;
+    private void loadDonations(String driveId) {
+        ProgressDialog progressDialog = new ProgressDialog(requireContext());
+        progressDialog.setMessage("Refreshing donations...");
+        progressDialog.show();
 
-        List<Donation> filteredDonations = new ArrayList<>(allDonations);
+        donationRepository.getDonationsByDrive(driveId, new DonationRepository.OnCompleteListener<List<Donation>>() {
+            @Override
+            public void onSuccess(List<Donation> donations) {
+                progressDialog.dismiss();
+                if (donations.isEmpty()) {
+                    emptyStateText.setVisibility(View.VISIBLE);
+                    donationsRecyclerView.setVisibility(View.GONE);
+                } else {
+                    emptyStateText.setVisibility(View.GONE);
+                    donationsRecyclerView.setVisibility(View.VISIBLE);
+                    donationsAdapter.setDonations(donations);
+                }
+                applySortAndFilter(); // Apply any active filters after loading
+            }
+
+            @Override
+            public void onError(Exception e) {
+                progressDialog.dismiss();
+                Log.e("DriveDetailFragment", e.getMessage());
+                Toast.makeText(requireContext(),
+                        "Error loading donations: " + e.getMessage(),
+                        Toast.LENGTH_SHORT).show();
+                emptyStateText.setVisibility(View.VISIBLE);
+                donationsRecyclerView.setVisibility(View.GONE);
+            }
+        });
+    }
+
+    private void applySortAndFilter() {
+        if (donationsAdapter.getDonations().isEmpty()) return;
+
+        List<Donation> filteredDonations = new ArrayList<>(donationsAdapter.getDonations());
 
         // Apply blood type filter
         String selectedBloodType = bloodTypeFilterSpinner.getSelectedItem().toString();

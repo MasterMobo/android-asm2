@@ -119,6 +119,9 @@ public class DonationsAdapter extends RecyclerView.Adapter<DonationsAdapter.View
         return donations.size();
     }
 
+    public List<Donation> getDonations() {
+        return new ArrayList<>(donations);
+    }
     public void setDonations(List<Donation> newDonations) {
         donations.clear();
         donations.addAll(newDonations);
