@@ -1,12 +1,20 @@
 package com.example.blooddono.activities;
 
+import android.Manifest;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.widget.Button;
+import android.widget.Toast;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
 
 import com.example.blooddono.R;
+import com.google.android.gms.location.FusedLocationProviderClient;
+import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
@@ -16,17 +24,36 @@ import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 
 public class LocationPickerActivity extends AppCompatActivity implements OnMapReadyCallback {
+    private static final float DEFAULT_ZOOM = 15f;
+
     private GoogleMap mMap;
     private Marker currentMarker;
     private Button confirmButton;
     private double initialLatitude;
     private double initialLongitude;
     private boolean hasInitialLocation;
+    private FusedLocationProviderClient fusedLocationClient;
+    private ActivityResultLauncher<String> requestPermissionLauncher;
+    private boolean locationPermissionGranted = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_location_picker);
+
+        // Initialize location client
+        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
+
+        // Initialize permission launcher
+        requestPermissionLauncher = registerForActivityResult(
+                new ActivityResultContracts.RequestPermission(),
+                isGranted -> {
+                    locationPermissionGranted = isGranted;
+                    if (isGranted && mMap != null) {
+                        getUserLocation();
+                    }
+                }
+        );
 
         // Get initial location if it exists
         hasInitialLocation = getIntent().hasExtra("latitude") && getIntent().hasExtra("longitude");
@@ -41,7 +68,7 @@ public class LocationPickerActivity extends AppCompatActivity implements OnMapRe
         mapFragment.getMapAsync(this);
 
         confirmButton = findViewById(R.id.confirmButton);
-        confirmButton.setEnabled(hasInitialLocation); // Enable button if we have initial location
+        confirmButton.setEnabled(false); // Will be enabled when a location is selected
 
         confirmButton.setOnClickListener(v -> {
             if (currentMarker != null) {
@@ -51,6 +78,43 @@ public class LocationPickerActivity extends AppCompatActivity implements OnMapRe
                 resultIntent.putExtra("longitude", position.longitude);
                 setResult(RESULT_OK, resultIntent);
                 finish();
+            }
+        });
+
+        // Check location permission
+        checkLocationPermission();
+    }
+
+    private void checkLocationPermission() {
+        if (ActivityCompat.checkSelfPermission(this,
+                Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+            locationPermissionGranted = true;
+        } else {
+            requestPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION);
+        }
+    }
+
+    private void getUserLocation() {
+        if (!locationPermissionGranted) {
+            return;
+        }
+
+        if (ActivityCompat.checkSelfPermission(this,
+                Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            return;
+        }
+
+        fusedLocationClient.getLastLocation().addOnSuccessListener(this, location -> {
+            if (location != null && !hasInitialLocation) {
+                LatLng userLatLng = new LatLng(location.getLatitude(), location.getLongitude());
+                if (currentMarker != null) {
+                    currentMarker.remove();
+                }
+                currentMarker = mMap.addMarker(new MarkerOptions()
+                        .position(userLatLng)
+                        .title("Selected Location"));
+                mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(userLatLng, DEFAULT_ZOOM));
+                confirmButton.setEnabled(true);
             }
         });
     }
@@ -66,11 +130,12 @@ public class LocationPickerActivity extends AppCompatActivity implements OnMapRe
             currentMarker = mMap.addMarker(new MarkerOptions()
                     .position(initialPosition)
                     .title("Selected Location"));
+            mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(initialPosition, DEFAULT_ZOOM));
+            confirmButton.setEnabled(true);
         } else {
-            initialPosition = new LatLng(10.729313489742879, 106.69588800185203); // Default location (Sydney)
+            // Try to get user's location
+            getUserLocation();
         }
-
-        mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(initialPosition, 15));
 
         // Enable zoom controls
         mMap.getUiSettings().setZoomControlsEnabled(true);
