@@ -47,4 +47,6 @@ dependencies {
     implementation("androidx.navigation:navigation-fragment:2.5.3")
     implementation("androidx.navigation:navigation-ui:2.5.3")
     implementation("com.google.firebase:firebase-auth:22.3.1")
+    implementation("com.squareup.okhttp3:okhttp:4.9.1")
+    implementation("com.google.maps.android:android-maps-utils:2.2.0")
 }

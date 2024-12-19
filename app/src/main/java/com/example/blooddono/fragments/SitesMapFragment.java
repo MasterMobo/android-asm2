@@ -37,9 +37,17 @@ import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.LatLngBounds;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
+import com.google.android.gms.maps.model.Polyline;
+import com.google.android.gms.maps.model.PolylineOptions;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
+import com.google.maps.android.PolyUtil;
 
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import java.io.IOException;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -47,6 +55,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+
+import okhttp3.Call;
+import okhttp3.Callback;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
 
 public class SitesMapFragment extends Fragment implements OnMapReadyCallback {
     private static final float DEFAULT_ZOOM = 15f;
@@ -70,6 +84,9 @@ public class SitesMapFragment extends Fragment implements OnMapReadyCallback {
     private LinearLayout operatingHoursLayout;
     private ChipGroup bloodTypeChipGroup;
     private Button detailsButton;
+    private Button directionsButton;
+    private Polyline currentRoute;
+    private DonationSite currentSite;
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
@@ -90,6 +107,8 @@ public class SitesMapFragment extends Fragment implements OnMapReadyCallback {
         operatingHoursLayout = bottomSheet.findViewById(R.id.operatingHoursLayout);
         bloodTypeChipGroup = bottomSheet.findViewById(R.id.bloodTypeChipGroup);
         detailsButton = bottomSheet.findViewById(R.id.detailsButton);
+        directionsButton = bottomSheet.findViewById(R.id.directionsButton);
+        directionsButton.setOnClickListener(v -> showDirections());
 
         // Initialize location client
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(requireActivity());
@@ -147,6 +166,142 @@ public class SitesMapFragment extends Fragment implements OnMapReadyCallback {
                         Math.max(mMap.getCameraPosition().zoom, DEFAULT_ZOOM)
                 )
         );
+    }
+
+    private void showDirections() {
+        if (currentSite == null) {
+            Toast.makeText(requireContext(),
+                    "No site selected", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        if (ActivityCompat.checkSelfPermission(requireContext(),
+                Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissionLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION);
+            return;
+        }
+
+        fusedLocationClient.getLastLocation().addOnSuccessListener(requireActivity(), location -> {
+            if (location == null) {
+                Toast.makeText(requireContext(),
+                        "Unable to get current location", Toast.LENGTH_SHORT).show();
+                return;
+            }
+
+            // Show loading indicator
+            ProgressDialog progressDialog = new ProgressDialog(requireContext());
+            progressDialog.setMessage("Getting directions...");
+            progressDialog.show();
+
+            // Construct the URL for the Directions API
+            String origin = location.getLatitude() + "," + location.getLongitude();
+            String destination = currentSite.getLatitude() + "," + currentSite.getLongitude();
+            String directionsUrl = "https://maps.googleapis.com/maps/api/directions/json?" +
+                    "origin=" + origin +
+                    "&destination=" + destination +
+                    "&key=" + getString(R.string.map_api_key);
+
+            // Make HTTP request using OkHttp
+            OkHttpClient client = new OkHttpClient();
+            Request request = new Request.Builder()
+                    .url(directionsUrl)
+                    .build();
+
+            client.newCall(request).enqueue(new Callback() {
+                @Override
+                public void onFailure(Call call, IOException e) {
+                    requireActivity().runOnUiThread(() -> {
+                        progressDialog.dismiss();
+                        Toast.makeText(requireContext(),
+                                "Error getting directions: " + e.getMessage(),
+                                Toast.LENGTH_SHORT).show();
+                    });
+                }
+
+                @Override
+                public void onResponse(Call call, Response response) throws IOException {
+                    if (!response.isSuccessful()) {
+                        requireActivity().runOnUiThread(() -> {
+                            progressDialog.dismiss();
+                            Toast.makeText(requireContext(),
+                                    "Error getting directions",
+                                    Toast.LENGTH_SHORT).show();
+                        });
+                        return;
+                    }
+
+                    try {
+                        String jsonData = response.body().string();
+                        JSONObject json = new JSONObject(jsonData);
+
+                        // Parse the route
+                        JSONArray routes = json.getJSONArray("routes");
+                        if (routes.length() == 0) {
+                            requireActivity().runOnUiThread(() -> {
+                                progressDialog.dismiss();
+                                Toast.makeText(requireContext(),
+                                        "No route found",
+                                        Toast.LENGTH_SHORT).show();
+                            });
+                            return;
+                        }
+
+                        JSONObject route = routes.getJSONObject(0);
+                        JSONObject overviewPolyline = route.getJSONObject("overview_polyline");
+                        String encodedPath = overviewPolyline.getString("points");
+
+                        // Get route summary
+                        JSONArray legs = route.getJSONArray("legs");
+                        JSONObject leg = legs.getJSONObject(0);
+                        String distance = leg.getJSONObject("distance").getString("text");
+                        String duration = leg.getJSONObject("duration").getString("text");
+
+                        // Decode the polyline and draw on map
+                        requireActivity().runOnUiThread(() -> {
+                            progressDialog.dismiss();
+
+                            // Remove previous route if exists
+                            if (currentRoute != null) {
+                                currentRoute.remove();
+                            }
+
+                            // Decode the polyline
+                            List<LatLng> decodedPath = PolyUtil.decode(encodedPath);
+
+                            // Draw the route
+                            PolylineOptions polylineOptions = new PolylineOptions()
+                                    .addAll(decodedPath)
+                                    .width(10)
+                                    .color(Color.BLUE);
+
+                            currentRoute = mMap.addPolyline(polylineOptions);
+
+                            // Show route info
+                            String routeInfo = "Distance: " + distance + "\nDuration: " + duration;
+                            Toast.makeText(requireContext(), routeInfo, Toast.LENGTH_LONG).show();
+
+                            // Zoom map to show entire route
+                            LatLngBounds.Builder boundsBuilder = new LatLngBounds.Builder();
+                            for (LatLng latLng : decodedPath) {
+                                boundsBuilder.include(latLng);
+                            }
+                            LatLngBounds bounds = boundsBuilder.build();
+                            int padding = 100;
+                            CameraUpdate cu = CameraUpdateFactory.newLatLngBounds(bounds, padding);
+                            mMap.animateCamera(cu);
+                        });
+
+                    } catch (JSONException e) {
+                        requireActivity().runOnUiThread(() -> {
+                            progressDialog.dismiss();
+                            Toast.makeText(requireContext(),
+                                    "Error parsing directions data",
+                                    Toast.LENGTH_SHORT).show();
+                        });
+                    }
+                }
+            });
+        });
     }
 
     private void displayAvailability(DonationSite site) {
@@ -234,14 +389,20 @@ public class SitesMapFragment extends Fragment implements OnMapReadyCallback {
 
         // Set marker click listener
         mMap.setOnMapClickListener(latLng -> {
-            // Hide bottom sheet when clicking on map
+            // Hide bottom sheet and clear current site when clicking on map
             bottomSheet.setVisibility(View.GONE);
+            currentSite = null;
+            if (currentRoute != null) {
+                currentRoute.remove();
+                currentRoute = null;
+            }
         });
 
         mMap.setOnMarkerClickListener(marker -> {
             if (!marker.equals(userLocationMarker)) {
                 DonationSite site = markerToSite.get(marker);
                 if (site != null) {
+                    currentSite = site; // Store the selected site
                     showSiteDetails(site);
                 }
             }
@@ -367,6 +528,18 @@ public class SitesMapFragment extends Fragment implements OnMapReadyCallback {
         super.onResume();
         if (mMap != null) {
             updateUserLocation();
+        }
+    }
+
+
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+        // Clean up references
+        currentSite = null;
+        if (currentRoute != null) {
+            currentRoute.remove();
+            currentRoute = null;
         }
     }
 }
