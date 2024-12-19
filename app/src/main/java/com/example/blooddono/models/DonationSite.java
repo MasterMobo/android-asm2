@@ -25,6 +25,7 @@ public class DonationSite {
     private String hoursType; // 24/7 or specific
     private Map<String, DayHours> operatingHours; // Day of week -> operating hours
     private List<String> neededBloodTypes;
+    private List<String> volunteerIds;
 
     public DonationSite() {
         // Required empty constructor for Firebase
@@ -77,6 +78,8 @@ public class DonationSite {
     public String getAddress() {
         return address;
     }
+    public List<String> getVolunteerIds() { return volunteerIds; }
+    public void setVolunteerIds(List<String> volunteerIds) { this.volunteerIds = volunteerIds; }
 
     @Override
     public String toString() {

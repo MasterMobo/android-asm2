@@ -170,6 +170,14 @@ public class DonationSiteRepository {
                 .addOnFailureListener(listener::onError);
     }
 
+    public void addVolunteer(String siteId, String volunteerId, OnCompleteListener<Void> listener) {
+        db.collection(COLLECTION_NAME)
+                .document(siteId)
+                .update("volunteerIds", FieldValue.arrayUnion(volunteerId))
+                .addOnSuccessListener(aVoid -> listener.onSuccess(null))
+                .addOnFailureListener(listener::onError);
+    }
+
     private DonationSite documentToDonationSite(DocumentSnapshot document) {
         String type = document.getString("type");
         if (type == null) {
@@ -196,11 +204,18 @@ public class DonationSiteRepository {
             }
         }
 
-        // Get blood types with backward compatibility
+        // Get blood types
         List<String> neededBloodTypes = new ArrayList<>();
         Object bloodTypesObj = document.get("neededBloodTypes");
         if (bloodTypesObj instanceof List) {
             neededBloodTypes = (List<String>) bloodTypesObj;
+        }
+
+        // Get volunteer IDs
+        List<String> volunteerIds = new ArrayList<>();
+        Object volunteerIdsObj = document.get("volunteerIds");
+        if (volunteerIdsObj instanceof List) {
+            volunteerIds = (List<String>) volunteerIdsObj;
         }
 
         DonationSite site = new DonationSite(
@@ -218,6 +233,7 @@ public class DonationSiteRepository {
         );
         site.setOwnerId(document.getString("ownerId"));
         site.setId(document.getId());
+        site.setVolunteerIds(volunteerIds);
         return site;
     }
 }

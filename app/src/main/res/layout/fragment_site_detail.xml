@@ -277,6 +277,15 @@
             android:visibility="gone"
             style="@style/Widget.MaterialComponents.Button"/>
 
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/volunteerButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Register to Volunteer"
+            android:visibility="gone"
+            style="@style/Widget.MaterialComponents.Button"/>
+
     </LinearLayout>
 
 </ScrollView>

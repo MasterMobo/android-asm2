@@ -37,6 +37,7 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 
 public class SiteDetailFragment extends Fragment {
     private TextView ownerNameText;
@@ -57,6 +58,7 @@ public class SiteDetailFragment extends Fragment {
     private RecyclerView donationsRecyclerView;
     private TextView noDonationsText;
     private DonationsAdapter donationsAdapter;
+    private MaterialButton volunteerButton;
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
@@ -86,6 +88,7 @@ public class SiteDetailFragment extends Fragment {
         donateButton = view.findViewById(R.id.donateButton);
         donationsRecyclerView = view.findViewById(R.id.donationsRecyclerView);
         noDonationsText = view.findViewById(R.id.noDonationsText);
+        volunteerButton = view.findViewById(R.id.volunteerButton);
 
         // Setup donations RecyclerView
         donationsAdapter = new DonationsAdapter(requireContext());
@@ -135,8 +138,21 @@ public class SiteDetailFragment extends Fragment {
                         if (User.ROLE_DONOR.equals(user.getRole())) {
                             donateButton.setVisibility(View.VISIBLE);
                             donateButton.setOnClickListener(v -> handleDonation(user));
+
+                            volunteerButton.setVisibility(View.GONE);
                         } else {
                             donateButton.setVisibility(View.GONE);
+
+                            if (site.getOwnerId().equals(currentUserId)) {
+                                return;
+                            }
+
+                            if (site.getVolunteerIds() != null && site.getVolunteerIds().contains(currentUserId)) {
+                                return;
+                            }
+
+                            volunteerButton.setVisibility(View.VISIBLE);
+                            volunteerButton.setOnClickListener(v -> handleVolunteer());
                         }
                     }
 
@@ -350,5 +366,26 @@ public class SiteDetailFragment extends Fragment {
                 donationsRecyclerView.setVisibility(View.GONE);
             }
         });
+    }
+
+
+
+    private void handleVolunteer() {
+        String currentUserId = FirebaseAuth.getInstance().getCurrentUser().getUid();
+        siteRepository.addVolunteer(currentSite.getId(), currentUserId,
+                new DonationSiteRepository.OnCompleteListener<Void>() {
+                    @Override
+                    public void onSuccess(Void result) {
+                        Toast.makeText(requireContext(), "Registered as volunteer successfully",
+                                Toast.LENGTH_SHORT).show();
+                        volunteerButton.setEnabled(false);
+                    }
+
+                    @Override
+                    public void onError(Exception e) {
+                        Toast.makeText(requireContext(), "Error registering as volunteer: " + e.getMessage(),
+                                Toast.LENGTH_SHORT).show();
+                    }
+                });
     }
 }
