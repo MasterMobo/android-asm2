@@ -1,5 +1,6 @@
 package com.example.blooddono.repositories;
 
+import com.example.blooddono.models.Donation;
 import com.example.blooddono.models.DonationDrive;
 import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
@@ -9,9 +10,11 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 public class DonationDriveRepository {
     private static final String COLLECTION_NAME = "donationDrives";
@@ -157,13 +160,42 @@ public class DonationDriveRepository {
     }
 
     public void completeDrive(String driveId, OnCompleteListener<Void> listener) {
-        // First deactivate the current drive
-        db.collection(COLLECTION_NAME)
-                .document(driveId)
-                .update("active", false,
-                        "completedAt", System.currentTimeMillis())
-                .addOnSuccessListener(aVoid -> {
-                    // Then create a new drive
+        // Get all pending donations for this drive first
+        DonationRepository donationRepo = new DonationRepository();
+        donationRepo.getDonationsByDrive(driveId, new DonationRepository.OnCompleteListener<List<Donation>>() {
+            @Override
+            public void onSuccess(List<Donation> donations) {
+                // Filter for pending donations
+                List<Donation> pendingDonations = donations.stream()
+                        .filter(d -> Donation.STATUS_PENDING.equals(d.getStatus()))
+                        .collect(Collectors.toList());
+
+                // Create batch for all operations
+                var batch = db.batch();
+
+                // Update drive status
+                var driveRef = db.collection(COLLECTION_NAME).document(driveId);
+                batch.update(driveRef,
+                        "active", false,
+                        "completedAt", System.currentTimeMillis());
+
+                // Complete each pending donation with 0 mL
+                for (Donation donation : pendingDonations) {
+                    var donationRef = db.collection("donations").document(donation.getId());
+                    Map<String, Double> collectedAmounts = new HashMap<>();
+                    for (String bloodType : donation.getBloodTypes()) {
+                        collectedAmounts.put(bloodType, 0.0);
+                    }
+
+                    batch.update(donationRef,
+                            "status", Donation.STATUS_COMPLETED,
+                            "completedAt", System.currentTimeMillis(),
+                            "collectedAmounts", collectedAmounts);
+                }
+
+                // Commit all changes
+                batch.commit().addOnSuccessListener(aVoid -> {
+                    // Create new drive after successful completion
                     createDefaultDrive(new OnCompleteListener<DonationDrive>() {
                         @Override
                         public void onSuccess(DonationDrive drive) {
@@ -175,9 +207,16 @@ public class DonationDriveRepository {
                             listener.onError(e);
                         }
                     });
-                })
-                .addOnFailureListener(listener::onError);
+                }).addOnFailureListener(listener::onError);
+            }
+
+            @Override
+            public void onError(Exception e) {
+                listener.onError(e);
+            }
+        });
     }
+
 
     public void getPastDrives(OnCompleteListener<List<DonationDrive>> listener) {
         db.collection(COLLECTION_NAME)

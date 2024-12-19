@@ -148,8 +148,11 @@ public class DonationDrivesFragment extends Fragment {
     private void handleCompleteCurrentDrive() {
         new AlertDialog.Builder(requireContext())
                 .setTitle("Complete Drive")
-                .setMessage("Are you sure you want to complete the current drive? " +
-                        "This will create a new drive automatically.")
+                .setMessage("Are you sure you want to complete the current drive?\n\n" +
+                        "This will:\n" +
+                        "• Complete all pending donations with 0 mL collected\n" +
+                        "• Create a new drive automatically\n\n" +
+                        "This action cannot be undone.")
                 .setPositiveButton("Complete", (dialog, which) -> {
                     ProgressDialog progressDialog = new ProgressDialog(requireContext());
                     progressDialog.setMessage("Completing drive...");
