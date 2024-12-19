@@ -3,12 +3,14 @@ package com.example.blooddono.fragments;
 import android.Manifest;
 import android.app.ProgressDialog;
 import android.content.pm.PackageManager;
+import android.graphics.Color;
 import android.location.Location;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -20,6 +22,7 @@ import androidx.fragment.app.Fragment;
 import androidx.navigation.Navigation;
 
 import com.example.blooddono.R;
+import com.example.blooddono.models.DayHours;
 import com.example.blooddono.models.DonationSite;
 import com.example.blooddono.repositories.DonationSiteRepository;
 import com.google.android.gms.location.FusedLocationProviderClient;
@@ -34,9 +37,15 @@ import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.LatLngBounds;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
+import com.google.android.material.chip.Chip;
+import com.google.android.material.chip.ChipGroup;
 
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 public class SitesMapFragment extends Fragment implements OnMapReadyCallback {
@@ -45,12 +54,22 @@ public class SitesMapFragment extends Fragment implements OnMapReadyCallback {
     private GoogleMap mMap;
     private DonationSiteRepository repository;
     private ProgressDialog loadingDialog;
-    private Map<Marker, String> markerToSiteId = new HashMap<>();
-    private View currentInfoWindow;
+    private Map<Marker, DonationSite> markerToSite = new HashMap<>();
     private FusedLocationProviderClient fusedLocationClient;
     private Marker userLocationMarker;
     private ActivityResultLauncher<String> requestPermissionLauncher;
     private boolean initialLocationSet = false;
+
+    // UI elements for bottom sheet
+    private View bottomSheet;
+    private TextView siteNameText;
+    private TextView addressText;
+    private TextView descriptionText;
+    private TextView availabilityText;
+    private TextView hoursTypeText;
+    private LinearLayout operatingHoursLayout;
+    private ChipGroup bloodTypeChipGroup;
+    private Button detailsButton;
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
@@ -60,6 +79,17 @@ public class SitesMapFragment extends Fragment implements OnMapReadyCallback {
     @Override
     public void onViewCreated(View view, Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
+
+        // Initialize bottom sheet views
+        bottomSheet = view.findViewById(R.id.bottomSheet);
+        siteNameText = bottomSheet.findViewById(R.id.siteNameText);
+        addressText = bottomSheet.findViewById(R.id.addressText);
+        descriptionText = bottomSheet.findViewById(R.id.descriptionText);
+        availabilityText = bottomSheet.findViewById(R.id.availabilityText);
+        hoursTypeText = bottomSheet.findViewById(R.id.hoursTypeText);
+        operatingHoursLayout = bottomSheet.findViewById(R.id.operatingHoursLayout);
+        bloodTypeChipGroup = bottomSheet.findViewById(R.id.bloodTypeChipGroup);
+        detailsButton = bottomSheet.findViewById(R.id.detailsButton);
 
         // Initialize location client
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(requireActivity());
@@ -88,45 +118,134 @@ public class SitesMapFragment extends Fragment implements OnMapReadyCallback {
         loadingDialog.setCancelable(false);
     }
 
+    private void showSiteDetails(DonationSite site) {
+        // Update basic info
+        siteNameText.setText(site.getName());
+        addressText.setText(site.getAddress());
+        descriptionText.setText(site.getDescription());
+
+        // Display availability
+        displayAvailability(site);
+
+        // Display operating hours
+        displayOperatingHours(site);
+
+        // Display blood types
+        displayBloodTypes(site);
+
+        // Set up details button click listener
+        detailsButton.setOnClickListener(v -> navigateToSiteDetails(site.getId()));
+
+        // Show bottom sheet
+        bottomSheet.setVisibility(View.VISIBLE);
+
+        // Animate camera to the site
+        LatLng position = new LatLng(site.getLatitude(), site.getLongitude());
+        mMap.animateCamera(
+                CameraUpdateFactory.newLatLngZoom(
+                        position,
+                        Math.max(mMap.getCameraPosition().zoom, DEFAULT_ZOOM)
+                )
+        );
+    }
+
+    private void displayAvailability(DonationSite site) {
+        if (DonationSite.TYPE_PERMANENT.equals(site.getType())) {
+            availabilityText.setText("Permanently available");
+        } else {
+            SimpleDateFormat sdf = new SimpleDateFormat("MMM dd, yyyy", Locale.getDefault());
+            String startDate = sdf.format(new Date(site.getStartDate()));
+            String endDate = sdf.format(new Date(site.getEndDate()));
+
+            long currentTime = System.currentTimeMillis();
+            boolean isActive = currentTime >= site.getStartDate() && currentTime <= site.getEndDate();
+
+            String status = isActive ? "Active" : "Inactive";
+            availabilityText.setText(String.format("Available from %s to %s\nStatus: %s",
+                    startDate, endDate, status));
+        }
+    }
+
+    private void displayOperatingHours(DonationSite site) {
+        if (DonationSite.HOURS_24_7.equals(site.getHoursType())) {
+            hoursTypeText.setText("Open 24 hours a day, 7 days a week");
+            operatingHoursLayout.setVisibility(View.GONE);
+        } else {
+            hoursTypeText.setText("Operating hours by day:");
+            operatingHoursLayout.setVisibility(View.VISIBLE);
+            operatingHoursLayout.removeAllViews();
+
+            String[] days = {"Monday", "Tuesday", "Wednesday", "Thursday",
+                    "Friday", "Saturday", "Sunday"};
+
+            for (String day : days) {
+                DayHours hours = site.getOperatingHours().get(day);
+                if (hours != null && hours.isOpen()) {
+                    View hourView = getLayoutInflater().inflate(
+                            R.layout.operating_hours_detail_item,
+                            operatingHoursLayout,
+                            false
+                    );
+
+                    TextView dayText = hourView.findViewById(R.id.dayText);
+                    TextView hoursText = hourView.findViewById(R.id.hoursText);
+
+                    dayText.setText(day);
+                    hoursText.setText(String.format("%s - %s",
+                            formatTime(hours.getOpenTime()),
+                            formatTime(hours.getCloseTime()))
+                    );
+
+                    operatingHoursLayout.addView(hourView);
+                }
+            }
+        }
+    }
+
+    private void displayBloodTypes(DonationSite site) {
+        bloodTypeChipGroup.removeAllViews();
+        if (site.getNeededBloodTypes() != null && !site.getNeededBloodTypes().isEmpty()) {
+            for (String bloodType : site.getNeededBloodTypes()) {
+                Chip chip = new Chip(requireContext());
+                chip.setText(bloodType);
+                chip.setClickable(false);
+                chip.setChipBackgroundColorResource(R.color.design_default_color_primary);
+                chip.setTextColor(Color.WHITE);
+                bloodTypeChipGroup.addView(chip);
+            }
+        }
+    }
+
+    private String formatTime(String time) {
+        try {
+            SimpleDateFormat input = new SimpleDateFormat("HH:mm", Locale.getDefault());
+            SimpleDateFormat output = new SimpleDateFormat("h:mm a", Locale.getDefault());
+            Date date = input.parse(time);
+            return date != null ? output.format(date) : time;
+        } catch (ParseException e) {
+            return time;
+        }
+    }
+
     @Override
     public void onMapReady(GoogleMap googleMap) {
         mMap = googleMap;
         mMap.getUiSettings().setZoomControlsEnabled(true);
 
-        // Set custom info window adapter
-        mMap.setInfoWindowAdapter(new GoogleMap.InfoWindowAdapter() {
-            @Override
-            public View getInfoWindow(Marker marker) {
-                return null;
-            }
-
-            @Override
-            public View getInfoContents(Marker marker) {
-                // Skip info window for user location marker
-                if (marker.equals(userLocationMarker)) {
-                    return null;
-                }
-
-                View view = getLayoutInflater().inflate(R.layout.map_info_window, null);
-                TextView titleText = view.findViewById(R.id.titleText);
-                TextView snippetText = view.findViewById(R.id.snippetText);
-                Button detailsButton = view.findViewById(R.id.detailsButton);
-
-                titleText.setText(marker.getTitle());
-                snippetText.setText(marker.getSnippet());
-
-                currentInfoWindow = view;
-                return view;
-            }
+        // Set marker click listener
+        mMap.setOnMapClickListener(latLng -> {
+            // Hide bottom sheet when clicking on map
+            bottomSheet.setVisibility(View.GONE);
         });
 
-        mMap.setOnInfoWindowClickListener(marker -> {
-            if (!marker.equals(userLocationMarker) && currentInfoWindow != null) {
-                String siteId = markerToSiteId.get(marker);
-                if (siteId != null) {
-                    navigateToSiteDetails(siteId);
+        mMap.setOnMarkerClickListener(marker -> {
+            if (!marker.equals(userLocationMarker)) {
+                DonationSite site = markerToSite.get(marker);
+                if (site != null) {
+                    showSiteDetails(site);
                 }
             }
+            return true;
         });
 
         // Enable location layer and get user location
@@ -156,7 +275,6 @@ public class SitesMapFragment extends Fragment implements OnMapReadyCallback {
             if (location != null) {
                 LatLng userLatLng = new LatLng(location.getLatitude(), location.getLongitude());
 
-                // Update or create user location marker
                 if (userLocationMarker != null) {
                     userLocationMarker.setPosition(userLatLng);
                 } else {
@@ -166,7 +284,6 @@ public class SitesMapFragment extends Fragment implements OnMapReadyCallback {
                             .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_BLUE)));
                 }
 
-                // Move camera to user location if it's the first time
                 if (!initialLocationSet) {
                     mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(userLatLng, DEFAULT_ZOOM));
                     initialLocationSet = true;
@@ -209,7 +326,7 @@ public class SitesMapFragment extends Fragment implements OnMapReadyCallback {
         }
 
         LatLngBounds.Builder boundsBuilder = new LatLngBounds.Builder();
-        markerToSiteId.clear();
+        markerToSite.clear();
 
         // Add markers for each site
         for (DonationSite site : sites) {
@@ -217,11 +334,10 @@ public class SitesMapFragment extends Fragment implements OnMapReadyCallback {
 
             Marker marker = mMap.addMarker(new MarkerOptions()
                     .position(position)
-                    .title(site.getName())
-                    .snippet(site.getAddress()));
+                    .title(site.getName()));
 
             if (marker != null) {
-                markerToSiteId.put(marker, site.getId());
+                markerToSite.put(marker, site);
             }
 
             boundsBuilder.include(position);
