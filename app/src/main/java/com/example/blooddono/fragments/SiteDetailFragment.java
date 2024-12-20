@@ -148,10 +148,12 @@ public class SiteDetailFragment extends Fragment {
                             donateButton.setVisibility(View.GONE);
 
                             if (site.getOwnerId().equals(currentUserId)) {
+                                volunteerButton.setVisibility(View.GONE);
                                 return;
                             }
 
                             if (site.getVolunteerIds() != null && site.getVolunteerIds().contains(currentUserId)) {
+                                volunteerButton.setVisibility(View.GONE);
                                 return;
                             }
 
@@ -412,7 +414,8 @@ public class SiteDetailFragment extends Fragment {
                     public void onSuccess(Void result) {
                         Toast.makeText(requireContext(), "Registered as volunteer successfully",
                                 Toast.LENGTH_SHORT).show();
-                        volunteerButton.setEnabled(false);
+                        // Reload the site details to refresh the UI
+                        loadSiteDetails(currentSite.getId());
                     }
 
                     @Override
