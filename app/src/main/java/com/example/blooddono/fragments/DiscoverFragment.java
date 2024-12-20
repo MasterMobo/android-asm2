@@ -1,39 +1,54 @@
 package com.example.blooddono.fragments;
 
-import android.graphics.Color;
+import android.app.DatePickerDialog;
+import android.app.Dialog;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.CheckBox;
 import android.widget.EditText;
+import android.widget.GridLayout;
 import android.widget.TextView;
 import androidx.fragment.app.Fragment;
 import androidx.navigation.Navigation;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+import android.widget.Button;
 import android.widget.ProgressBar;
+
 import com.example.blooddono.R;
 import com.example.blooddono.models.DonationSite;
 import com.example.blooddono.repositories.DonationSiteRepository;
+import com.google.android.material.button.MaterialButton;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
+import android.graphics.Color;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 public class DiscoverFragment extends Fragment {
     private RecyclerView recyclerView;
     private ProgressBar progressBar;
     private TextView emptyStateText;
     private EditText searchInput;
+    private MaterialButton bloodTypeFilterButton;
+    private MaterialButton dateFilterButton;
+    private MaterialButton clearFiltersButton;
     private DonationSiteRepository repository;
     private SitesAdapter adapter;
     private List<DonationSite> allSites = new ArrayList<>();
+    private Set<String> selectedBloodTypes = new HashSet<>();
+    private Long selectedDate = null;
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
@@ -49,6 +64,9 @@ public class DiscoverFragment extends Fragment {
         progressBar = view.findViewById(R.id.progressBar);
         emptyStateText = view.findViewById(R.id.emptyStateText);
         searchInput = view.findViewById(R.id.searchInput);
+        bloodTypeFilterButton = view.findViewById(R.id.bloodTypeFilterButton);
+        dateFilterButton = view.findViewById(R.id.dateFilterButton);
+        clearFiltersButton = view.findViewById(R.id.clearFiltersButton);
 
         // Initialize repository
         repository = new DonationSiteRepository();
@@ -68,27 +86,132 @@ public class DiscoverFragment extends Fragment {
 
             @Override
             public void afterTextChanged(Editable s) {
-                filterSites(s.toString());
+                filterSites();
             }
         });
+
+        // Setup filter buttons
+        bloodTypeFilterButton.setOnClickListener(v -> showBloodTypeFilterDialog());
+        dateFilterButton.setOnClickListener(v -> showDateFilterDialog());
+        clearFiltersButton.setOnClickListener(v -> clearFilters());
 
         // Load sites
         loadSites();
     }
 
-    private void filterSites(String query) {
-        if (query.isEmpty()) {
-            adapter.setSites(allSites);
-            updateEmptyState(allSites.isEmpty());
-            return;
+    private void showBloodTypeFilterDialog() {
+        Dialog dialog = new Dialog(requireContext());
+        dialog.setContentView(R.layout.dialog_blood_type_filter);
+
+        GridLayout bloodTypeGrid = dialog.findViewById(R.id.bloodTypeGrid);
+        Button applyButton = dialog.findViewById(R.id.applyButton);
+
+        // Add checkboxes for each blood type
+        Set<String> tempSelectedTypes = new HashSet<>(selectedBloodTypes);
+        for (String bloodType : DonationSite.BLOOD_TYPES) {
+            CheckBox checkBox = new CheckBox(requireContext());
+            checkBox.setText(bloodType);
+            checkBox.setChecked(selectedBloodTypes.contains(bloodType));
+            checkBox.setOnCheckedChangeListener((buttonView, isChecked) -> {
+                if (isChecked) {
+                    tempSelectedTypes.add(bloodType);
+                } else {
+                    tempSelectedTypes.remove(bloodType);
+                }
+            });
+            bloodTypeGrid.addView(checkBox);
         }
 
+        applyButton.setOnClickListener(v -> {
+            selectedBloodTypes = tempSelectedTypes;
+            updateFilterButtonsAppearance();
+            filterSites();
+            dialog.dismiss();
+        });
+
+        dialog.show();
+    }
+
+    private void showDateFilterDialog() {
+        Calendar calendar = Calendar.getInstance();
+        if (selectedDate != null) {
+            calendar.setTimeInMillis(selectedDate);
+        }
+
+        DatePickerDialog datePickerDialog = new DatePickerDialog(
+                requireContext(),
+                (view, year, month, dayOfMonth) -> {
+                    Calendar selectedCal = Calendar.getInstance();
+                    selectedCal.set(year, month, dayOfMonth);
+                    selectedDate = selectedCal.getTimeInMillis();
+                    updateFilterButtonsAppearance();
+                    filterSites();
+                },
+                calendar.get(Calendar.YEAR),
+                calendar.get(Calendar.MONTH),
+                calendar.get(Calendar.DAY_OF_MONTH)
+        );
+
+        datePickerDialog.show();
+    }
+
+    private void clearFilters() {
+        selectedBloodTypes.clear();
+        selectedDate = null;
+        updateFilterButtonsAppearance();
+        filterSites();
+    }
+
+    private void updateFilterButtonsAppearance() {
+        boolean hasFilters = !selectedBloodTypes.isEmpty() || selectedDate != null;
+        clearFiltersButton.setVisibility(hasFilters ? View.VISIBLE : View.GONE);
+
+        // Update blood type filter button appearance
+        if (!selectedBloodTypes.isEmpty()) {
+            bloodTypeFilterButton.setStrokeColor(getResources().getColorStateList(R.color.design_default_color_primary));
+            bloodTypeFilterButton.setStrokeWidth(4);
+        } else {
+            bloodTypeFilterButton.setStrokeColor(getResources().getColorStateList(R.color.design_default_color_primary));
+            bloodTypeFilterButton.setStrokeWidth(1);
+        }
+
+        // Update date filter button appearance
+        if (selectedDate != null) {
+            dateFilterButton.setStrokeColor(getResources().getColorStateList(R.color.design_default_color_primary));
+            dateFilterButton.setStrokeWidth(4);
+            SimpleDateFormat sdf = new SimpleDateFormat("MMM dd", Locale.getDefault());
+            dateFilterButton.setText(sdf.format(new Date(selectedDate)));
+        } else {
+            dateFilterButton.setStrokeColor(getResources().getColorStateList(R.color.design_default_color_primary));
+            dateFilterButton.setStrokeWidth(1);
+            dateFilterButton.setText("Date");
+        }
+    }
+
+    private void filterSites() {
+        String query = searchInput.getText().toString().toLowerCase(Locale.getDefault());
         List<DonationSite> filteredSites = new ArrayList<>();
-        String lowercaseQuery = query.toLowerCase(Locale.getDefault());
 
         for (DonationSite site : allSites) {
-            if (site.getName().toLowerCase(Locale.getDefault()).contains(lowercaseQuery) ||
-                    site.getDescription().toLowerCase(Locale.getDefault()).contains(lowercaseQuery)) {
+            // Apply text search filter
+            boolean matchesSearch = query.isEmpty() ||
+                    site.getName().toLowerCase(Locale.getDefault()).contains(query) ||
+                    site.getDescription().toLowerCase(Locale.getDefault()).contains(query);
+
+            // Apply blood type filter
+            boolean matchesBloodType = selectedBloodTypes.isEmpty() ||
+                    site.getNeededBloodTypes().stream().anyMatch(selectedBloodTypes::contains);
+
+            // Apply date filter
+            boolean matchesDate = true;
+            if (selectedDate != null) {
+                if (DonationSite.TYPE_LIMITED.equals(site.getType())) {
+                    matchesDate = selectedDate >= site.getStartDate() && selectedDate <= site.getEndDate();
+                }
+                // Permanent sites are always available, so they match any date
+            }
+
+            if (matchesSearch && matchesBloodType && matchesDate) {
                 filteredSites.add(site);
             }
         }
@@ -100,10 +223,10 @@ public class DiscoverFragment extends Fragment {
     private void updateEmptyState(boolean isEmpty) {
         if (isEmpty) {
             String searchText = searchInput.getText().toString();
-            if (searchText.isEmpty()) {
+            if (searchText.isEmpty() && selectedBloodTypes.isEmpty() && selectedDate == null) {
                 emptyStateText.setText("No donation sites available");
             } else {
-                emptyStateText.setText("No matches found for \"" + searchText + "\"");
+                emptyStateText.setText("No sites match your filters");
             }
             emptyStateText.setVisibility(View.VISIBLE);
             recyclerView.setVisibility(View.GONE);
@@ -120,13 +243,7 @@ public class DiscoverFragment extends Fragment {
             public void onSuccess(List<DonationSite> sites) {
                 progressBar.setVisibility(View.GONE);
                 allSites = sites;
-                String currentQuery = searchInput.getText().toString();
-                if (currentQuery.isEmpty()) {
-                    adapter.setSites(sites);
-                    updateEmptyState(sites.isEmpty());
-                } else {
-                    filterSites(currentQuery);
-                }
+                filterSites(); // This will apply any active filters and update the UI
             }
 
             @Override
@@ -163,6 +280,19 @@ public class DiscoverFragment extends Fragment {
 
             holder.addressText.setText(site.getAddress());
 
+            // Set availability text
+            StringBuilder availabilityText = new StringBuilder();
+            if (DonationSite.TYPE_PERMANENT.equals(site.getType())) {
+                availabilityText.append("Permanently Available");
+            } else {
+                SimpleDateFormat sdf = new SimpleDateFormat("MMM dd, yyyy", Locale.getDefault());
+                String startDate = sdf.format(new Date(site.getStartDate()));
+                String endDate = sdf.format(new Date(site.getEndDate()));
+                availabilityText.append("Available from ").append(startDate)
+                        .append(" to ").append(endDate);
+            }
+            holder.availabilityText.setText(availabilityText);
+
             // Set opening status
             String status;
             if (DonationSite.TYPE_LIMITED.equals(site.getType())) {
@@ -198,12 +328,14 @@ public class DiscoverFragment extends Fragment {
                     Chip chip = new Chip(holder.itemView.getContext());
                     chip.setText(bloodType);
                     chip.setClickable(false);
-                    chip.setChipBackgroundColorResource(R.color.design_default_color_primary);
+                    boolean isSelected = selectedBloodTypes.contains(bloodType);
+                    chip.setChipBackgroundColorResource(isSelected ?
+                            R.color.design_default_color_secondary :
+                            R.color.design_default_color_primary);
                     chip.setTextColor(Color.WHITE);
                     holder.bloodTypeChipGroup.addView(chip);
                 }
             }
-
         }
 
         @Override
@@ -221,6 +353,7 @@ public class DiscoverFragment extends Fragment {
             TextView descriptionText;
             TextView addressText;
             TextView statusText;
+            TextView availabilityText;
             ChipGroup bloodTypeChipGroup;
 
             SiteViewHolder(View itemView) {
@@ -229,6 +362,7 @@ public class DiscoverFragment extends Fragment {
                 descriptionText = itemView.findViewById(R.id.descriptionText);
                 addressText = itemView.findViewById(R.id.addressText);
                 statusText = itemView.findViewById(R.id.statusText);
+                availabilityText = itemView.findViewById(R.id.availabilityText);
                 bloodTypeChipGroup = itemView.findViewById(R.id.bloodTypeChipGroup);
 
                 itemView.setOnClickListener(v -> {
