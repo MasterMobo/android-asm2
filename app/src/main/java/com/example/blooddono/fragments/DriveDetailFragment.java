@@ -1,6 +1,8 @@
 package com.example.blooddono.fragments;
 
 import android.app.ProgressDialog;
+import android.content.Intent;
+import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -14,6 +16,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AlertDialog;
+import androidx.core.content.FileProvider;
 import androidx.fragment.app.Fragment;
 import androidx.navigation.Navigation;
 import androidx.recyclerview.widget.LinearLayoutManager;
@@ -22,11 +25,16 @@ import com.example.blooddono.R;
 import com.example.blooddono.adapters.DonationsAdapter;
 import com.example.blooddono.models.Donation;
 import com.example.blooddono.models.DonationDrive;
+import com.example.blooddono.models.User;
 import com.example.blooddono.repositories.DonationDriveRepository;
 import com.example.blooddono.repositories.DonationRepository;
+import com.example.blooddono.repositories.UserRepository;
+import com.example.blooddono.utils.PDFGenerator;
 import com.google.android.material.card.MaterialCardView;
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.firebase.auth.FirebaseAuth;
 
+import java.io.File;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -41,7 +49,6 @@ public class DriveDetailFragment extends Fragment {
     private TextView driveDatesText;
     private TextView totalDonationsText;
     private TextView bloodTypeSummaryText;
-    private MaterialCardView summaryCard;
     private RecyclerView donationsRecyclerView;
     private TextView emptyStateText;
     private Spinner sortSpinner;
@@ -49,9 +56,12 @@ public class DriveDetailFragment extends Fragment {
     private DonationDriveRepository driveRepository;
     private DonationRepository donationRepository;
     private DonationsAdapter donationsAdapter;
+    private UserRepository userRepository;
     private List<Donation> allDonations = new ArrayList<>();
     private DonationDrive currentDrive;
     private Button completeCurrentDriveButton;
+    private FloatingActionButton downloadFab;
+    private ProgressDialog progressDialog;
     private boolean isOwner = false;
 
     @Override
@@ -66,19 +76,21 @@ public class DriveDetailFragment extends Fragment {
         // Initialize repositories
         driveRepository = new DonationDriveRepository();
         donationRepository = new DonationRepository();
+        userRepository = new UserRepository();
 
         // Initialize views
         driveNameText = view.findViewById(R.id.driveNameText);
         driveDatesText = view.findViewById(R.id.driveDatesText);
         totalDonationsText = view.findViewById(R.id.totalDonationsText);
         bloodTypeSummaryText = view.findViewById(R.id.bloodTypeSummaryText);
-        summaryCard = view.findViewById(R.id.summaryCard);
         donationsRecyclerView = view.findViewById(R.id.donationsRecyclerView);
         emptyStateText = view.findViewById(R.id.emptyStateText);
         sortSpinner = view.findViewById(R.id.sortSpinner);
         bloodTypeFilterSpinner = view.findViewById(R.id.bloodTypeFilterSpinner);
         completeCurrentDriveButton = view.findViewById(R.id.completeCurrentDriveButton);
+        downloadFab = view.findViewById(R.id.downloadFab);
 
+        downloadFab.setOnClickListener(v -> handleDownloadReport());
         completeCurrentDriveButton.setOnClickListener(v -> handleCompleteCurrentDrive());
 
         // Setup recyclerView
@@ -92,6 +104,23 @@ public class DriveDetailFragment extends Fragment {
         if (driveId != null) {
             loadDriveDetails(driveId);
         }
+
+        String currentUserId = FirebaseAuth.getInstance().getCurrentUser().getUid();
+        userRepository.getUser(currentUserId, new UserRepository.OnCompleteListener<User>() {
+            @Override
+            public void onSuccess(User user) {
+                if (!user.getRole().equals(User.ROLE_SUPER_USER)) {
+                    downloadFab.setVisibility(View.GONE);
+                }
+            }
+
+            @Override
+            public void onError(Exception e) {
+                Toast.makeText(requireContext(),
+                        "Error loading user: " + e.getMessage(),
+                        Toast.LENGTH_SHORT).show();
+            }
+        });
     }
 
     private void setupRecyclerView() {
@@ -320,6 +349,71 @@ public class DriveDetailFragment extends Fragment {
                             });
                 })
                 .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    private void handleDownloadReport() {
+        if (currentDrive == null) return;
+
+        progressDialog = new ProgressDialog(requireContext());
+        progressDialog.setMessage("Generating PDF report...");
+        progressDialog.setCancelable(false);
+        progressDialog.show();
+
+        // Get all donations for the drive
+        donationRepository.getDonationsByDrive(currentDrive.getId(),
+                new DonationRepository.OnCompleteListener<List<Donation>>() {
+                    @Override
+                    public void onSuccess(List<Donation> donations) {
+                        PDFGenerator.generateDriveReport(requireContext(),
+                                currentDrive, donations,
+                                new PDFGenerator.OnPDFGeneratedListener() {
+                                    @Override
+                                    public void onSuccess(File pdfFile) {
+                                        progressDialog.dismiss();
+                                        showSuccessDialog(pdfFile);
+                                    }
+
+                                    @Override
+                                    public void onError(Exception e) {
+                                        progressDialog.dismiss();
+                                        Toast.makeText(requireContext(),
+                                                "Error generating PDF: " + e.getMessage(),
+                                                Toast.LENGTH_SHORT).show();
+                                    }
+                                });
+                    }
+
+                    @Override
+                    public void onError(Exception e) {
+                        progressDialog.dismiss();
+                        Toast.makeText(requireContext(),
+                                "Error fetching donations: " + e.getMessage(),
+                                Toast.LENGTH_SHORT).show();
+                    }
+                });
+    }
+
+    private void showSuccessDialog(File pdfFile) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
+        builder.setTitle("Report Generated")
+                .setMessage("PDF report has been saved to:\n" + pdfFile.getPath())
+                .setPositiveButton("Share", (dialog, which) -> {
+                    // Create content URI using FileProvider
+                    Uri contentUri = FileProvider.getUriForFile(requireContext(),
+                            "com.example.blooddono.fileprovider",
+                            pdfFile);
+
+                    // Create share intent
+                    Intent shareIntent = new Intent(Intent.ACTION_SEND);
+                    shareIntent.setType("application/pdf");
+                    shareIntent.putExtra(Intent.EXTRA_STREAM, contentUri);
+                    shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+
+                    // Start share activity
+                    startActivity(Intent.createChooser(shareIntent, "Share PDF Report"));
+                })
+                .setNeutralButton("OK", null)
                 .show();
     }
 }

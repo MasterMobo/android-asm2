@@ -1,5 +1,8 @@
 package com.example.blooddono.fragments;
 
+import android.app.ProgressDialog;
+import android.content.Intent;
+import android.net.Uri;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -11,17 +14,24 @@ import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.appcompat.app.AlertDialog;
+import androidx.core.content.FileProvider;
 import androidx.fragment.app.Fragment;
 import androidx.navigation.Navigation;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.blooddono.R;
+import com.example.blooddono.models.Donation;
 import com.example.blooddono.models.DonationDrive;
 import com.example.blooddono.models.User;
 import com.example.blooddono.repositories.DonationDriveRepository;
+import com.example.blooddono.repositories.DonationRepository;
 import com.example.blooddono.repositories.UserRepository;
+import com.example.blooddono.utils.PDFGenerator;
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
+import java.io.File;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -37,9 +47,12 @@ public class SuperUserDrivesFragment extends Fragment {
     private TextView emptyStateText;
     private Spinner sortSpinner;
     private DonationDriveRepository driveRepository;
+    private DonationRepository donationRepository;
     private UserRepository userRepository;
     private DrivesAdapter drivesAdapter;
     private List<DonationDrive> allDrives = new ArrayList<>();
+    private FloatingActionButton downloadAllFab;
+    private ProgressDialog progressDialog;
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
@@ -55,10 +68,13 @@ public class SuperUserDrivesFragment extends Fragment {
         progressBar = view.findViewById(R.id.progressBar);
         emptyStateText = view.findViewById(R.id.emptyStateText);
         sortSpinner = view.findViewById(R.id.sortSpinner);
+        downloadAllFab = view.findViewById(R.id.downloadAllFab);
+        downloadAllFab.setOnClickListener(v -> handleDownloadAllReports());
 
         // Initialize repository
         driveRepository = new DonationDriveRepository();
         userRepository = new UserRepository();
+        donationRepository = new DonationRepository();
 
         // Setup RecyclerView
         drivesAdapter = new DrivesAdapter();
@@ -270,5 +286,147 @@ public class SuperUserDrivesFragment extends Fragment {
                 completedText = view.findViewById(R.id.completedText);
             }
         }
+    }
+
+    private void handleDownloadAllReports() {
+        // Show loading dialog
+        progressDialog = new ProgressDialog(requireContext());
+        progressDialog.setMessage("Generating reports...");
+        progressDialog.setCancelable(false);
+        progressDialog.show();
+
+        // First get all drives
+        driveRepository.getAllDrives(new DonationDriveRepository.OnCompleteListener<List<DonationDrive>>() {
+            @Override
+            public void onSuccess(List<DonationDrive> drives) {
+                // Create counter to track completion of owner info fetching
+                final AtomicInteger ownerCounter = new AtomicInteger(drives.size());
+                final List<Exception> ownerErrors = new ArrayList<>();
+
+                // First fetch all owner information
+                for (DonationDrive drive : drives) {
+                    userRepository.getUser(drive.getOwnerId(),
+                            new UserRepository.OnCompleteListener<User>() {
+                                @Override
+                                public void onSuccess(User user) {
+                                    drive.setOwnerName(user.getFullName());
+                                    if (ownerCounter.decrementAndGet() == 0) {
+                                        // Now generate reports with owner information
+                                        generateReportsForDrives(drives);
+                                    }
+                                }
+
+                                @Override
+                                public void onError(Exception e) {
+                                    ownerErrors.add(e);
+                                    drive.setOwnerName("Unknown");
+                                    if (ownerCounter.decrementAndGet() == 0) {
+                                        generateReportsForDrives(drives);
+                                    }
+                                }
+                            });
+                }
+            }
+
+            @Override
+            public void onError(Exception e) {
+                progressDialog.dismiss();
+                showErrorDialog("Failed to fetch drives: " + e.getMessage());
+            }
+        });
+    }
+
+    private void generateReportsForDrives(List<DonationDrive> drives) {
+        // Create counter to track completion of report generation
+        final AtomicInteger counter = new AtomicInteger(drives.size());
+        final List<File> generatedFiles = new ArrayList<>();
+        final List<Exception> errors = new ArrayList<>();
+
+        // Process each drive
+        for (DonationDrive drive : drives) {
+            // Get donations for this drive
+            donationRepository.getDonationsByDrive(drive.getId(),
+                    new DonationRepository.OnCompleteListener<List<Donation>>() {
+                        @Override
+                        public void onSuccess(List<Donation> donations) {
+                            PDFGenerator.generateDriveReport(requireContext(),
+                                    drive, donations,
+                                    new PDFGenerator.OnPDFGeneratedListener() {
+                                        @Override
+                                        public void onSuccess(File pdfFile) {
+                                            generatedFiles.add(pdfFile);
+                                            checkCompletion(counter, generatedFiles, errors);
+                                        }
+
+                                        @Override
+                                        public void onError(Exception e) {
+                                            errors.add(e);
+                                            checkCompletion(counter, generatedFiles, errors);
+                                        }
+                                    });
+                        }
+
+                        @Override
+                        public void onError(Exception e) {
+                            errors.add(e);
+                            checkCompletion(counter, generatedFiles, errors);
+                        }
+                    });
+        }
+    }
+    private void checkCompletion(AtomicInteger counter, List<File> generatedFiles, List<Exception> errors) {
+        if (counter.decrementAndGet() == 0) {
+            progressDialog.dismiss();
+
+            // Show completion dialog
+            requireActivity().runOnUiThread(() -> {
+                if (!errors.isEmpty()) {
+                    showErrorDialog("Some reports failed to generate. " +
+                            errors.size() + " errors occurred.");
+                } else {
+                    showSuccessDialog(generatedFiles);
+                }
+            });
+        }
+    }
+
+    private void showSuccessDialog(List<File> files) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
+        builder.setTitle("Reports Generated")
+                .setMessage(files.size() + " PDF reports have been saved to:\n" +
+                        files.get(0).getParentFile().getPath())
+                .setPositiveButton("Share", (dialog, which) -> {
+                    sharePDFFiles(files);
+                })
+                .setNeutralButton("OK", null)
+                .show();
+    }
+
+    private void showErrorDialog(String message) {
+        new AlertDialog.Builder(requireContext())
+                .setTitle("Error")
+                .setMessage(message)
+                .setPositiveButton("OK", null)
+                .show();
+    }
+
+    private void sharePDFFiles(List<File> files) {
+        // Create ArrayList of URIs for sharing
+        ArrayList<Uri> uris = new ArrayList<>();
+        for (File file : files) {
+            Uri contentUri = FileProvider.getUriForFile(requireContext(),
+                    "com.example.blooddono.fileprovider",
+                    file);
+            uris.add(contentUri);
+        }
+
+        // Create share intent for multiple files
+        Intent shareIntent = new Intent(Intent.ACTION_SEND_MULTIPLE);
+        shareIntent.setType("application/pdf");
+        shareIntent.putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris);
+        shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+
+        // Start share activity
+        startActivity(Intent.createChooser(shareIntent, "Share PDF Reports"));
     }
 }
