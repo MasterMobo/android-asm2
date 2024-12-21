@@ -5,6 +5,7 @@ import android.util.Log;
 import com.example.blooddono.models.Donation;
 import com.example.blooddono.models.DonationDrive;
 import com.example.blooddono.models.DonationSite;
+import com.example.blooddono.utils.NotificationUtils;
 import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.Query;
@@ -55,6 +56,9 @@ public class DonationRepository {
                                     // Increment total donations in drive
                                     transaction.update(driveRef, "totalDonations", FieldValue.increment(1));
 
+                                    // Send notification after successful write
+                                    NotificationUtils.sendDonationNotification(db.getApp().getApplicationContext(), donation);
+
                                     return donationRef.getId();
                                 }).addOnSuccessListener(donationId -> {
                                     listener.onSuccess(donationId.toString());
@@ -73,8 +77,7 @@ public class DonationRepository {
                 listener.onError(e);
             }
         });
-    }
-    public void getDonationsByDrive(String driveId, OnCompleteListener<List<Donation>> listener) {
+    }    public void getDonationsByDrive(String driveId, OnCompleteListener<List<Donation>> listener) {
         db.collection(COLLECTION_NAME)
                 .whereEqualTo("driveId", driveId)
                 .get()
