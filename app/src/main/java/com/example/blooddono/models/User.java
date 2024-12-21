@@ -3,6 +3,8 @@ package com.example.blooddono.models;
 public class User {
     public static final String ROLE_DONOR = "donor";
     public static final String ROLE_SITE_MANAGER = "site_manager";
+    public static final String ROLE_SUPER_USER = "super_user";
+
 
     private String uid;
     private String email;

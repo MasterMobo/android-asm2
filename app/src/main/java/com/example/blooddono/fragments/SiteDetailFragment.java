@@ -140,26 +140,35 @@ public class SiteDetailFragment extends Fragment {
                         donationsAdapter.setShowConfirmButton(isOwner);
 
                         if (User.ROLE_DONOR.equals(user.getRole())) {
+                            // Donor can only see donate button
                             donateButton.setVisibility(View.VISIBLE);
                             donateButton.setOnClickListener(v -> handleDonation(user));
-
+                            volunteerButton.setVisibility(View.GONE);
+                        } else if (User.ROLE_SUPER_USER.equals(user.getRole())) {
+                            // Super user can't see either button
+                            donateButton.setVisibility(View.GONE);
                             volunteerButton.setVisibility(View.GONE);
                         } else {
+                            // Site manager logic
                             donateButton.setVisibility(View.GONE);
 
+                            // Show volunteer button only if:
+                            // 1. Not the owner of the site
+                            // 2. Not already a volunteer
+                            // 3. Not a super user
                             if (site.getOwnerId().equals(currentUserId)) {
                                 volunteerButton.setVisibility(View.GONE);
                                 return;
                             }
 
-                            if (site.getVolunteerIds() != null && site.getVolunteerIds().contains(currentUserId)) {
+                            if (site.getVolunteerIds() != null &&
+                                    site.getVolunteerIds().contains(currentUserId)) {
                                 volunteerButton.setVisibility(View.GONE);
                                 return;
                             }
 
                             volunteerButton.setVisibility(View.VISIBLE);
-                            volunteerButton.setOnClickListener(v -> handleVolunteer());
-                        }
+                            volunteerButton.setOnClickListener(v -> handleVolunteer());                        }
                     }
 
                     @Override

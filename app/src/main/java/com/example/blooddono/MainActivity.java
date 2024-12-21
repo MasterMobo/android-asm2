@@ -73,16 +73,27 @@ public class MainActivity extends AppCompatActivity {
                 @Override
                 public void onSuccess(User user) {
                     // Set the appropriate menu based on user role
-                    if (user.getRole().equals(User.ROLE_DONOR)) {
-                        bottomNav.getMenu().clear();
-                        bottomNav.inflateMenu(R.menu.donor_nav_menu);
-                        // Set start destination to Discover for donors
-                        navController.getGraph().setStartDestination(R.id.discoverFragment);
-                    } else {
-                        bottomNav.getMenu().clear();
-                        bottomNav.inflateMenu(R.menu.manager_nav_menu);
-                        // Set start destination to My Sites for managers
-                        navController.getGraph().setStartDestination(R.id.mySitesFragment);
+                    switch (user.getRole()) {
+                        case User.ROLE_DONOR:
+                            bottomNav.getMenu().clear();
+                            bottomNav.inflateMenu(R.menu.donor_nav_menu);
+                            // Set start destination to Discover for donors
+                            navController.getGraph().setStartDestination(R.id.discoverFragment);
+                            break;
+
+                        case User.ROLE_SITE_MANAGER:
+                            bottomNav.getMenu().clear();
+                            bottomNav.inflateMenu(R.menu.manager_nav_menu);
+                            // Set start destination to My Sites for managers
+                            navController.getGraph().setStartDestination(R.id.mySitesFragment);
+                            break;
+
+                        case User.ROLE_SUPER_USER:
+                            bottomNav.getMenu().clear();
+                            bottomNav.inflateMenu(R.menu.super_user_nav_menu);
+                            // Set start destination to Map for super users
+                            navController.getGraph().setStartDestination(R.id.sitesMapFragment);
+                            break;
                     }
 
                     // Connect bottom nav with nav controller

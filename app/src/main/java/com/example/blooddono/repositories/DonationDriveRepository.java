@@ -233,6 +233,22 @@ public class DonationDriveRepository {
                 })
                 .addOnFailureListener(listener::onError);    }
 
+    public void getAllDrives(OnCompleteListener<List<DonationDrive>> listener) {
+        db.collection(COLLECTION_NAME)
+                .orderBy("startDate", Query.Direction.DESCENDING)
+                .get()
+                .addOnSuccessListener(querySnapshot -> {
+                    List<DonationDrive> drives = new ArrayList<>();
+                    for (var doc : querySnapshot) {
+                        DonationDrive drive = doc.toObject(DonationDrive.class);
+                        drive.setId(doc.getId());
+                        drives.add(drive);
+                    }
+                    listener.onSuccess(drives);
+                })
+                .addOnFailureListener(listener::onError);
+    }
+
     public interface OnCompleteListener<T> {
         void onSuccess(T result);
         void onError(Exception e);

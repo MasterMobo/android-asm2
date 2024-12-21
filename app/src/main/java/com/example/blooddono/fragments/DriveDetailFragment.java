@@ -22,9 +22,13 @@ import com.example.blooddono.R;
 import com.example.blooddono.adapters.DonationsAdapter;
 import com.example.blooddono.models.Donation;
 import com.example.blooddono.models.DonationDrive;
+import com.example.blooddono.models.User;
 import com.example.blooddono.repositories.DonationDriveRepository;
 import com.example.blooddono.repositories.DonationRepository;
+import com.example.blooddono.repositories.UserRepository;
 import com.google.android.material.card.MaterialCardView;
+import com.google.firebase.auth.FirebaseAuth;
+
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -50,6 +54,8 @@ public class DriveDetailFragment extends Fragment {
     private List<Donation> allDonations = new ArrayList<>();
     private DonationDrive currentDrive;
     private Button completeCurrentDriveButton;
+    private UserRepository userRepository;
+    private boolean isSuperUser = false;
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
@@ -63,6 +69,7 @@ public class DriveDetailFragment extends Fragment {
         // Initialize repositories
         driveRepository = new DonationDriveRepository();
         donationRepository = new DonationRepository();
+        userRepository = new UserRepository();
 
         // Initialize views
         driveNameText = view.findViewById(R.id.driveNameText);
@@ -89,6 +96,48 @@ public class DriveDetailFragment extends Fragment {
             if (driveId != null) {
                 loadDriveDetails(driveId);
                 loadDonations(driveId);
+            }
+        });
+
+
+        // Check user role
+        String currentUserId = FirebaseAuth.getInstance().getCurrentUser().getUid();
+        userRepository.getUser(currentUserId, new UserRepository.OnCompleteListener<User>() {
+            @Override
+            public void onSuccess(User user) {
+                isSuperUser = User.ROLE_SUPER_USER.equals(user.getRole());
+
+                // Configure UI based on role
+                completeCurrentDriveButton.setVisibility(isSuperUser ? View.GONE : View.VISIBLE);
+
+                // Setup RecyclerView with role-appropriate adapter
+                donationsAdapter = new DonationsAdapter(requireContext());
+                donationsRecyclerView.setLayoutManager(new LinearLayoutManager(requireContext()));
+                donationsRecyclerView.setAdapter(donationsAdapter);
+                // Only allow site managers to confirm donations
+                donationsAdapter.setShowConfirmButton(!isSuperUser);
+                donationsAdapter.setOnDonationStatusChangedListener(() -> {
+                    String driveId = getArguments().getString("driveId");
+                    if (driveId != null) {
+                        loadDriveDetails(driveId);
+                        loadDonations(driveId);
+                    }
+                });
+
+                // Load data
+                String driveId = getArguments().getString("driveId");
+                if (driveId != null) {
+                    loadDriveDetails(driveId);
+                    loadDriveDonations(driveId);
+                    loadDonations(driveId);
+                }
+            }
+
+            @Override
+            public void onError(Exception e) {
+                Toast.makeText(requireContext(),
+                        "Error loading user details: " + e.getMessage(),
+                        Toast.LENGTH_SHORT).show();
             }
         });
 
@@ -196,9 +245,10 @@ public class DriveDetailFragment extends Fragment {
         }
         bloodTypeSummaryText.setText(summary.toString());
 
-        // Show/hide complete button based on drive status
-        completeCurrentDriveButton.setVisibility(drive.isActive() ? View.VISIBLE : View.GONE);
-    }
+        // Show/hide complete button based on drive status and user role
+        // Super users cannot complete drives
+        completeCurrentDriveButton.setVisibility(
+                (drive.isActive() && !isSuperUser) ? View.VISIBLE : View.GONE);    }
 
     private void loadDonations(String driveId) {
         ProgressDialog progressDialog = new ProgressDialog(requireContext());
@@ -290,6 +340,13 @@ public class DriveDetailFragment extends Fragment {
     }
 
     private void handleCompleteCurrentDrive() {
+        if (isSuperUser) {
+            Toast.makeText(requireContext(),
+                    "Super users cannot complete drives",
+                    Toast.LENGTH_SHORT).show();
+            return;
+        }
+
         if (currentDrive == null) return;
 
         new AlertDialog.Builder(requireContext())

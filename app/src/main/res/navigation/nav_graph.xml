@@ -70,4 +70,13 @@
             android:name="driveId"
             app:argType="string" />
     </fragment>
+
+    <fragment
+        android:id="@+id/superUserDrivesFragment"
+        android:name="com.example.blooddono.fragments.SuperUserDrivesFragment"
+        android:label="Donation Drives">
+        <action
+            android:id="@+id/action_superUserDrivesFragment_to_driveDetailFragment"
+            app:destination="@id/driveDetailFragment" />
+    </fragment>
 </navigation>
