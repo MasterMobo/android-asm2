@@ -18,8 +18,9 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.blooddono.R;
 import com.example.blooddono.models.DonationDrive;
+import com.example.blooddono.models.User;
 import com.example.blooddono.repositories.DonationDriveRepository;
-import com.google.android.material.card.MaterialCardView;
+import com.example.blooddono.repositories.UserRepository;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -28,13 +29,15 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class SuperUserDrivesFragment extends Fragment {
     private RecyclerView recyclerView;
     private ProgressBar progressBar;
     private TextView emptyStateText;
     private Spinner sortSpinner;
-    private DonationDriveRepository repository;
+    private DonationDriveRepository driveRepository;
+    private UserRepository userRepository;
     private DrivesAdapter drivesAdapter;
     private List<DonationDrive> allDrives = new ArrayList<>();
 
@@ -54,7 +57,8 @@ public class SuperUserDrivesFragment extends Fragment {
         sortSpinner = view.findViewById(R.id.sortSpinner);
 
         // Initialize repository
-        repository = new DonationDriveRepository();
+        driveRepository = new DonationDriveRepository();
+        userRepository = new UserRepository();
 
         // Setup RecyclerView
         drivesAdapter = new DrivesAdapter();
@@ -86,13 +90,42 @@ public class SuperUserDrivesFragment extends Fragment {
     }
 
     private void loadAllDrives() {
-        progressBar.setVisibility(View.VISIBLE);
-        repository.getAllDrives(new DonationDriveRepository.OnCompleteListener<List<DonationDrive>>() {
+        driveRepository.getAllDrives(new DonationDriveRepository.OnCompleteListener<List<DonationDrive>>() {
             @Override
             public void onSuccess(List<DonationDrive> drives) {
-                progressBar.setVisibility(View.GONE);
-                allDrives = drives;
-                updateDisplay();
+                if (drives.isEmpty()) {
+                    progressBar.setVisibility(View.GONE);
+                    allDrives = drives;
+                    updateDisplay();
+                    return;
+                }
+
+                AtomicInteger counter = new AtomicInteger(drives.size());
+
+                for (DonationDrive drive : drives) {
+                    userRepository.getUser(drive.getOwnerId(),
+                            new UserRepository.OnCompleteListener<User>() {
+                                @Override
+                                public void onSuccess(User user) {
+                                    drive.setOwnerName(user.getFullName());
+                                    if (counter.decrementAndGet() == 0) {
+                                        progressBar.setVisibility(View.GONE);
+                                        allDrives = drives; // Use original list since we modified the objects
+                                        updateDisplay();
+                                    }
+                                }
+
+                                @Override
+                                public void onError(Exception e) {
+                                    drive.setOwnerName("Unknown"); // Set fallback name on error
+                                    if (counter.decrementAndGet() == 0) {
+                                        progressBar.setVisibility(View.GONE);
+                                        allDrives = drives;
+                                        updateDisplay();
+                                    }
+                                }
+                            });
+                }
             }
 
             @Override
@@ -159,6 +192,9 @@ public class SuperUserDrivesFragment extends Fragment {
 
             // Set basic info
             holder.nameText.setText(drive.getName());
+            String ownerDisplay = "Managed by: " +
+                    (drive.getOwnerName() != null ? drive.getOwnerName() : "Unknown");
+            holder.ownerText.setText(ownerDisplay);
 
             // Set dates
             String dateRange = String.format("%s - %s",
@@ -174,7 +210,6 @@ public class SuperUserDrivesFragment extends Fragment {
             // Set statistics
             StringBuilder stats = new StringBuilder();
             stats.append(String.format("Total Donations: %d\n", drive.getTotalDonations()));
-            stats.append(String.format("Total Sites: %d\n\n", drive.getTotalSites()));
 
             // Add blood collection summary
             stats.append("Blood Collected:\n");
@@ -222,6 +257,7 @@ public class SuperUserDrivesFragment extends Fragment {
             final TextView datesText;
             final TextView statusText;
             final TextView statsText;
+            final TextView ownerText; // Add this
             final TextView completedText;
 
             ViewHolder(View view) {
@@ -230,6 +266,7 @@ public class SuperUserDrivesFragment extends Fragment {
                 datesText = view.findViewById(R.id.driveDatesText);
                 statusText = view.findViewById(R.id.statusText);
                 statsText = view.findViewById(R.id.statsText);
+                ownerText = view.findViewById(R.id.ownerText); // Add this
                 completedText = view.findViewById(R.id.completedText);
             }
         }

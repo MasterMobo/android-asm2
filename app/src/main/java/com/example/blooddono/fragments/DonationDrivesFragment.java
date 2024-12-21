@@ -19,6 +19,8 @@ import com.example.blooddono.R;
 import com.example.blooddono.models.DonationDrive;
 import com.example.blooddono.repositories.DonationDriveRepository;
 import com.google.android.material.card.MaterialCardView;
+import com.google.firebase.auth.FirebaseAuth;
+
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.List;
@@ -29,7 +31,6 @@ public class DonationDrivesFragment extends Fragment {
     private MaterialCardView currentDriveCard;
     private TextView driveNameText;
     private TextView driveDatesText;
-    private TextView totalSitesText;
     private TextView totalDonationsText;
     private TextView bloodTypeSummaryText;
     private DonationDriveRepository repository;
@@ -37,6 +38,7 @@ public class DonationDrivesFragment extends Fragment {
     private RecyclerView pastDrivesRecyclerView;
     private PastDrivesAdapter pastDrivesAdapter;
     private Button completeCurrentDriveButton;
+    private String currentUserId;
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
@@ -51,7 +53,6 @@ public class DonationDrivesFragment extends Fragment {
         currentDriveCard = view.findViewById(R.id.currentDriveCard);
         driveNameText = view.findViewById(R.id.driveNameText);
         driveDatesText = view.findViewById(R.id.driveDatesText);
-        totalSitesText = view.findViewById(R.id.totalSitesText);
         totalDonationsText = view.findViewById(R.id.totalDonationsText);
         bloodTypeSummaryText = view.findViewById(R.id.bloodTypeSummaryText);
         completeCurrentDriveButton = view.findViewById(R.id.completeCurrentDriveButton);
@@ -59,8 +60,9 @@ public class DonationDrivesFragment extends Fragment {
 
         repository = new DonationDriveRepository();
 
-        setupPastDrivesList(view);
-        loadCurrentDrive();
+        currentUserId = FirebaseAuth.getInstance().getCurrentUser().getUid();
+        loadCurrentDrive(currentUserId);
+        setupPastDrivesList(view, currentUserId);
 
         currentDriveCard.setOnClickListener(v -> {
             if (currentDrive != null) {
@@ -72,12 +74,17 @@ public class DonationDrivesFragment extends Fragment {
         });
     }
 
-    private void loadCurrentDrive() {
-        repository.getCurrentDrive(new DonationDriveRepository.OnCompleteListener<DonationDrive>() {
+    private void loadCurrentDrive(String ownerId) {
+        repository.getCurrentDrive(ownerId, new DonationDriveRepository.OnCompleteListener<DonationDrive>() {
             @Override
             public void onSuccess(DonationDrive drive) {
                 if (drive != null) {
                     currentDrive = drive; // Store the current drive
+
+                    if (currentDrive.getOwnerId().equals(currentUserId)) {
+                        completeCurrentDriveButton.setVisibility(View.GONE);
+                    }
+
                     displayDrive(drive);
                 } else {
                     showNoDriveState();
@@ -102,7 +109,6 @@ public class DonationDrivesFragment extends Fragment {
                 sdf.format(drive.getStartDate()),
                 sdf.format(drive.getEndDate())));
 
-        totalSitesText.setText(String.format("Total Sites: %d", drive.getTotalSites()));
         totalDonationsText.setText(String.format("Total Donations: %d", drive.getTotalDonations()));
 
         StringBuilder summary = new StringBuilder("Blood Collected:\n");
@@ -121,16 +127,16 @@ public class DonationDrivesFragment extends Fragment {
         Toast.makeText(requireContext(), "No active donation drive found", Toast.LENGTH_SHORT).show();
     }
 
-    private void setupPastDrivesList(View view) {
+    private void setupPastDrivesList(View view, String ownerId) {
         pastDrivesRecyclerView = view.findViewById(R.id.pastDrivesRecyclerView);
         pastDrivesAdapter = new PastDrivesAdapter();
         pastDrivesRecyclerView.setLayoutManager(new LinearLayoutManager(requireContext()));
         pastDrivesRecyclerView.setAdapter(pastDrivesAdapter);
-        loadPastDrives();
+        loadPastDrives(ownerId);
     }
 
-    private void loadPastDrives() {
-        repository.getPastDrives(new DonationDriveRepository.OnCompleteListener<List<DonationDrive>>() {
+    private void loadPastDrives(String ownerId) {
+        repository.getPastDrives(ownerId, new DonationDriveRepository.OnCompleteListener<List<DonationDrive>>() {
             @Override
             public void onSuccess(List<DonationDrive> drives) {
                 pastDrivesAdapter.setDrives(drives);
@@ -166,8 +172,9 @@ public class DonationDrivesFragment extends Fragment {
                                     Toast.makeText(requireContext(),
                                             "Drive completed successfully",
                                             Toast.LENGTH_SHORT).show();
-                                    loadCurrentDrive();
-                                    loadPastDrives();
+
+                                    loadCurrentDrive(currentUserId);
+                                    loadPastDrives(currentUserId);
                                 }
 
                                 @Override
@@ -205,8 +212,8 @@ public class DonationDrivesFragment extends Fragment {
                     sdf.format(drive.getEndDate()));
             holder.datesText.setText(dateRange);
 
-            holder.statsText.setText(String.format("Total Donations: %d\nTotal Sites: %d",
-                    drive.getTotalDonations(), drive.getTotalSites()));
+            holder.statsText.setText(String.format("Total Donations: %d",
+                    drive.getTotalDonations()));
 
             // Handle click to view details
             holder.itemView.setOnClickListener(v -> {

@@ -4,6 +4,8 @@ import android.util.Log;
 
 import com.example.blooddono.models.Donation;
 import com.example.blooddono.models.DonationDrive;
+import com.example.blooddono.models.DonationSite;
+import com.google.firebase.firestore.FieldValue;
 import com.google.firebase.firestore.FirebaseFirestore;
 import com.google.firebase.firestore.Query;
 import com.google.firebase.firestore.QuerySnapshot;
@@ -24,23 +26,46 @@ public class DonationRepository {
     }
 
     public void createDonation(Donation donation, OnCompleteListener<String> listener) {
-        // First ensure an active drive exists
-        driveRepository.ensureActiveDriveExists(new DonationDriveRepository.OnCompleteListener<DonationDrive>() {
-            @Override
-            public void onSuccess(DonationDrive drive) {
-                // Add drive ID to donation
-                donation.setDriveId(drive.getId());
+        // Get the current user's site manager
+        String siteId = donation.getSiteId();
+        DonationSiteRepository siteRepo = new DonationSiteRepository();
 
-                // Create donation in Firestore
-                db.collection(COLLECTION_NAME)
-                        .add(donation)
-                        .addOnSuccessListener(documentReference -> {
-                            String donationId = documentReference.getId();
-                            documentReference.update("id", donationId)
-                                    .addOnSuccessListener(aVoid -> listener.onSuccess(donationId))
-                                    .addOnFailureListener(listener::onError);
-                        })
-                        .addOnFailureListener(listener::onError);
+        siteRepo.getDonationSite(siteId, new DonationSiteRepository.OnCompleteListener<DonationSite>() {
+            @Override
+            public void onSuccess(DonationSite site) {
+                // Ensure an active drive exists for this site's owner
+                String siteOwnerId = site.getOwnerId();
+                driveRepository.ensureActiveDriveExists(siteOwnerId,
+                        new DonationDriveRepository.OnCompleteListener<DonationDrive>() {
+                            @Override
+                            public void onSuccess(DonationDrive drive) {
+                                // Use a transaction to create donation and update drive statistics
+                                db.runTransaction(transaction -> {
+                                    // Create donation document
+                                    var donationRef = db.collection(COLLECTION_NAME).document();
+                                    donation.setId(donationRef.getId());
+                                    donation.setDriveId(drive.getId());
+
+                                    // Get drive reference
+                                    var driveRef = db.collection("donationDrives").document(drive.getId());
+
+                                    // Write donation
+                                    transaction.set(donationRef, donation);
+
+                                    // Increment total donations in drive
+                                    transaction.update(driveRef, "totalDonations", FieldValue.increment(1));
+
+                                    return donationRef.getId();
+                                }).addOnSuccessListener(donationId -> {
+                                    listener.onSuccess(donationId.toString());
+                                }).addOnFailureListener(listener::onError);
+                            }
+
+                            @Override
+                            public void onError(Exception e) {
+                                listener.onError(e);
+                            }
+                        });
             }
 
             @Override
@@ -49,8 +74,6 @@ public class DonationRepository {
             }
         });
     }
-
-
     public void getDonationsByDrive(String driveId, OnCompleteListener<List<Donation>> listener) {
         db.collection(COLLECTION_NAME)
                 .whereEqualTo("driveId", driveId)
@@ -66,6 +89,7 @@ public class DonationRepository {
                 .addOnFailureListener(listener::onError);
     }
 
+
     public void updateDonationStatus(String donationId, String status,
                                      Map<String, Double> collectedAmounts,
                                      OnCompleteListener<Void> listener) {
@@ -76,7 +100,7 @@ public class DonationRepository {
 
                     String driveId = donationDoc.getString("driveId");
                     if (driveId == null) {
-                        Log.e("DonationRepository","Donation not associated with a drive");
+                        Log.e("DonationRepository", "Donation not associated with a drive");
                         return null;
                     }
 
@@ -93,9 +117,10 @@ public class DonationRepository {
                     }
                     transaction.update(donationRef, donationUpdates);
 
-                    // Update drive totals
+                    // Update drive totals only for blood collection amounts
                     if (status.equals(Donation.STATUS_COMPLETED)) {
-                        Map<String, Double> currentTotals = (Map<String, Double>) driveDoc.get("totalCollectedAmounts");
+                        Map<String, Double> currentTotals =
+                                (Map<String, Double>) driveDoc.get("totalCollectedAmounts");
                         if (currentTotals == null) {
                             currentTotals = new HashMap<>();
                         }
@@ -108,12 +133,7 @@ public class DonationRepository {
                             currentTotals.put(bloodType, currentAmount + amount);
                         }
 
-                        Map<String, Object> driveUpdates = new HashMap<>();
-                        driveUpdates.put("totalCollectedAmounts", currentTotals);
-                        driveUpdates.put("totalDonations",
-                                (driveDoc.getLong("totalDonations") != null ?
-                                        driveDoc.getLong("totalDonations") : 0) + 1);
-                        transaction.update(driveRef, driveUpdates);
+                        transaction.update(driveRef, "totalCollectedAmounts", currentTotals);
                     }
 
                     return null;

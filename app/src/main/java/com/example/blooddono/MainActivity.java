@@ -29,27 +29,10 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-
         // Initialize repositories
-        driveRepository = new DonationDriveRepository();
-
-        // Ensure active drive exists
-        driveRepository.ensureActiveDriveExists(new DonationDriveRepository.OnCompleteListener<DonationDrive>() {
-            @Override
-            public void onSuccess(DonationDrive drive) {
-                // Drive exists or was created successfully
-                Log.d("MainActivity", "Active drive ensured: " + drive.getName());
-            }
-
-            @Override
-            public void onError(Exception e) {
-                Log.e("MainActivity", "Error ensuring active drive: " + e.getMessage());
-            }
-        });
-
-        // Initialize Firebase and repository
         mAuth = FirebaseAuth.getInstance();
         userRepository = new UserRepository();
+        driveRepository = new DonationDriveRepository();
 
         // Initialize bottom navigation
         bottomNav = findViewById(R.id.bottom_navigation);
@@ -86,6 +69,8 @@ public class MainActivity extends AppCompatActivity {
                             bottomNav.inflateMenu(R.menu.manager_nav_menu);
                             // Set start destination to My Sites for managers
                             navController.getGraph().setStartDestination(R.id.mySitesFragment);
+                            // Ensure active drive exists for site manager
+                            ensureActiveDriveForManager(user.getUid());
                             break;
 
                         case User.ROLE_SUPER_USER:
@@ -112,6 +97,22 @@ public class MainActivity extends AppCompatActivity {
                 }
             });
         }
+    }
+
+    private void ensureActiveDriveForManager(String managerId) {
+        driveRepository.ensureActiveDriveExists(managerId,
+                new DonationDriveRepository.OnCompleteListener<DonationDrive>() {
+                    @Override
+                    public void onSuccess(DonationDrive drive) {
+                        // Drive exists or was created successfully
+                        Log.d("MainActivity", "Active drive ensured: " + drive.getName());
+                    }
+
+                    @Override
+                    public void onError(Exception e) {
+                        Log.e("MainActivity", "Error ensuring active drive: " + e.getMessage());
+                    }
+                });
     }
 
     @Override

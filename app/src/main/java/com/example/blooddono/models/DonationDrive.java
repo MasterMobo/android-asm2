@@ -5,6 +5,8 @@ import java.util.Map;
 
 public class DonationDrive {
     private String id;
+    private String ownerId;
+    private String ownerName;
     private String name;
     private long startDate;
     private long endDate;
@@ -19,7 +21,8 @@ public class DonationDrive {
         this.totalCollectedAmounts = new HashMap<>();
     }
 
-    public DonationDrive(String name, long startDate, long endDate) {
+    public DonationDrive(String ownerId, String name, long startDate, long endDate) {
+        this.ownerId = ownerId;
         this.name = name;
         this.startDate = startDate;
         this.endDate = endDate;
@@ -50,5 +53,10 @@ public class DonationDrive {
     public void setTotalDonations(int totalDonations) { this.totalDonations = totalDonations; }
     public long getCompletedAt() { return completedAt; }
     public void setCompletedAt(long completedAt) { this.completedAt = completedAt; }
+    public String getOwnerId() { return ownerId; }
+    public void setOwnerId(String ownerId) { this.ownerId = ownerId; }
+
+    public String getOwnerName() { return ownerName; }
+    public void setOwnerName(String ownerName) { this.ownerName = ownerName; }
 }
 

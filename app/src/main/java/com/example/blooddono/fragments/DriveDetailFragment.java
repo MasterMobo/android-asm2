@@ -22,17 +22,15 @@ import com.example.blooddono.R;
 import com.example.blooddono.adapters.DonationsAdapter;
 import com.example.blooddono.models.Donation;
 import com.example.blooddono.models.DonationDrive;
-import com.example.blooddono.models.User;
 import com.example.blooddono.repositories.DonationDriveRepository;
 import com.example.blooddono.repositories.DonationRepository;
-import com.example.blooddono.repositories.UserRepository;
 import com.google.android.material.card.MaterialCardView;
 import com.google.firebase.auth.FirebaseAuth;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
+import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -54,8 +52,7 @@ public class DriveDetailFragment extends Fragment {
     private List<Donation> allDonations = new ArrayList<>();
     private DonationDrive currentDrive;
     private Button completeCurrentDriveButton;
-    private UserRepository userRepository;
-    private boolean isSuperUser = false;
+    private boolean isOwner = false;
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
@@ -69,7 +66,6 @@ public class DriveDetailFragment extends Fragment {
         // Initialize repositories
         driveRepository = new DonationDriveRepository();
         donationRepository = new DonationRepository();
-        userRepository = new UserRepository();
 
         // Initialize views
         driveNameText = view.findViewById(R.id.driveNameText);
@@ -85,61 +81,8 @@ public class DriveDetailFragment extends Fragment {
 
         completeCurrentDriveButton.setOnClickListener(v -> handleCompleteCurrentDrive());
 
-        // Setup RecyclerView
-        donationsAdapter = new DonationsAdapter(requireContext());
-        donationsRecyclerView.setLayoutManager(new LinearLayoutManager(requireContext()));
-        donationsRecyclerView.setAdapter(donationsAdapter);
-        donationsAdapter.setShowConfirmButton(true);
-        donationsAdapter.setOnDonationStatusChangedListener(() -> {
-            // Reload both drive details and donations when status changes
-            String driveId = getArguments().getString("driveId");
-            if (driveId != null) {
-                loadDriveDetails(driveId);
-                loadDonations(driveId);
-            }
-        });
-
-
-        // Check user role
-        String currentUserId = FirebaseAuth.getInstance().getCurrentUser().getUid();
-        userRepository.getUser(currentUserId, new UserRepository.OnCompleteListener<User>() {
-            @Override
-            public void onSuccess(User user) {
-                isSuperUser = User.ROLE_SUPER_USER.equals(user.getRole());
-
-                // Configure UI based on role
-                completeCurrentDriveButton.setVisibility(isSuperUser ? View.GONE : View.VISIBLE);
-
-                // Setup RecyclerView with role-appropriate adapter
-                donationsAdapter = new DonationsAdapter(requireContext());
-                donationsRecyclerView.setLayoutManager(new LinearLayoutManager(requireContext()));
-                donationsRecyclerView.setAdapter(donationsAdapter);
-                // Only allow site managers to confirm donations
-                donationsAdapter.setShowConfirmButton(!isSuperUser);
-                donationsAdapter.setOnDonationStatusChangedListener(() -> {
-                    String driveId = getArguments().getString("driveId");
-                    if (driveId != null) {
-                        loadDriveDetails(driveId);
-                        loadDonations(driveId);
-                    }
-                });
-
-                // Load data
-                String driveId = getArguments().getString("driveId");
-                if (driveId != null) {
-                    loadDriveDetails(driveId);
-                    loadDriveDonations(driveId);
-                    loadDonations(driveId);
-                }
-            }
-
-            @Override
-            public void onError(Exception e) {
-                Toast.makeText(requireContext(),
-                        "Error loading user details: " + e.getMessage(),
-                        Toast.LENGTH_SHORT).show();
-            }
-        });
+        // Setup recyclerView
+        setupRecyclerView();
 
         // Setup spinners
         setupSpinners();
@@ -148,10 +91,20 @@ public class DriveDetailFragment extends Fragment {
         String driveId = getArguments().getString("driveId");
         if (driveId != null) {
             loadDriveDetails(driveId);
-            loadDriveDonations(driveId);
-            loadDonations(driveId);
         }
+    }
 
+    private void setupRecyclerView() {
+        donationsAdapter = new DonationsAdapter(requireContext());
+        donationsAdapter.setOnDonationStatusChangedListener(() -> {
+            String driveId = getArguments().getString("driveId");
+            if (driveId != null) {
+                loadDriveDetails(driveId);
+                loadDonations(driveId);
+            }
+        });
+        donationsRecyclerView.setLayoutManager(new LinearLayoutManager(requireContext()));
+        donationsRecyclerView.setAdapter(donationsAdapter);
     }
 
     private void setupSpinners() {
@@ -173,7 +126,7 @@ public class DriveDetailFragment extends Fragment {
         // Setup blood type filter options
         List<String> filterOptions = new ArrayList<>();
         filterOptions.add("All Blood Types");
-        filterOptions.addAll(Arrays.asList("A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"));
+        filterOptions.addAll(java.util.Arrays.asList("A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"));
         ArrayAdapter<String> filterAdapter = new ArrayAdapter<>(requireContext(),
                 android.R.layout.simple_spinner_item, filterOptions);
         filterAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
@@ -194,7 +147,15 @@ public class DriveDetailFragment extends Fragment {
             @Override
             public void onSuccess(DonationDrive drive) {
                 currentDrive = drive;
+                String currentUserId = FirebaseAuth.getInstance().getCurrentUser().getUid();
+                isOwner = drive.getOwnerId().equals(currentUserId);
+
+                // Update UI based on ownership
+                updateUIForOwnership();
+
+                // Display drive details
                 displayDriveSummary(drive);
+                loadDonations(driveId);
             }
 
             @Override
@@ -206,24 +167,11 @@ public class DriveDetailFragment extends Fragment {
         });
     }
 
-    private void loadDriveDonations(String driveId) {
-        donationRepository.getDonationsByDrive(driveId,
-                new DonationRepository.OnCompleteListener<List<Donation>>() {
-                    @Override
-                    public void onSuccess(List<Donation> donations) {
-                        allDonations = donations;
-                        applySortAndFilter();
-                        updateEmptyState();
-                    }
-
-                    @Override
-                    public void onError(Exception e) {
-                        Toast.makeText(requireContext(),
-                                "Error loading donations: " + e.getMessage(),
-                                Toast.LENGTH_SHORT).show();
-                        updateEmptyState();
-                    }
-                });
+    private void updateUIForOwnership() {
+        // Only show complete button and allow donation confirmation if user is the owner
+        completeCurrentDriveButton.setVisibility(
+                (currentDrive.isActive() && isOwner) ? View.VISIBLE : View.GONE);
+        donationsAdapter.setShowConfirmButton(isOwner);
     }
 
     private void displayDriveSummary(DonationDrive drive) {
@@ -244,11 +192,7 @@ public class DriveDetailFragment extends Fragment {
                     entry.getKey(), entry.getValue()));
         }
         bloodTypeSummaryText.setText(summary.toString());
-
-        // Show/hide complete button based on drive status and user role
-        // Super users cannot complete drives
-        completeCurrentDriveButton.setVisibility(
-                (drive.isActive() && !isSuperUser) ? View.VISIBLE : View.GONE);    }
+    }
 
     private void loadDonations(String driveId) {
         ProgressDialog progressDialog = new ProgressDialog(requireContext());
@@ -259,15 +203,9 @@ public class DriveDetailFragment extends Fragment {
             @Override
             public void onSuccess(List<Donation> donations) {
                 progressDialog.dismiss();
-                if (donations.isEmpty()) {
-                    emptyStateText.setVisibility(View.VISIBLE);
-                    donationsRecyclerView.setVisibility(View.GONE);
-                } else {
-                    emptyStateText.setVisibility(View.GONE);
-                    donationsRecyclerView.setVisibility(View.VISIBLE);
-                    donationsAdapter.setDonations(donations);
-                }
-                applySortAndFilter(); // Apply any active filters after loading
+                allDonations = donations;
+                applySortAndFilter();
+                updateEmptyState();
             }
 
             @Override
@@ -277,16 +215,15 @@ public class DriveDetailFragment extends Fragment {
                 Toast.makeText(requireContext(),
                         "Error loading donations: " + e.getMessage(),
                         Toast.LENGTH_SHORT).show();
-                emptyStateText.setVisibility(View.VISIBLE);
-                donationsRecyclerView.setVisibility(View.GONE);
+                updateEmptyState();
             }
         });
     }
 
     private void applySortAndFilter() {
-        if (donationsAdapter.getDonations().isEmpty()) return;
+        if (allDonations.isEmpty()) return;
 
-        List<Donation> filteredDonations = new ArrayList<>(donationsAdapter.getDonations());
+        List<Donation> filteredDonations = new ArrayList<>(allDonations);
 
         // Apply blood type filter
         String selectedBloodType = bloodTypeFilterSpinner.getSelectedItem().toString();
@@ -340,9 +277,9 @@ public class DriveDetailFragment extends Fragment {
     }
 
     private void handleCompleteCurrentDrive() {
-        if (isSuperUser) {
+        if (!isOwner) {
             Toast.makeText(requireContext(),
-                    "Super users cannot complete drives",
+                    "Only the drive owner can complete drives",
                     Toast.LENGTH_SHORT).show();
             return;
         }
@@ -369,7 +306,6 @@ public class DriveDetailFragment extends Fragment {
                                     Toast.makeText(requireContext(),
                                             "Drive completed successfully",
                                             Toast.LENGTH_SHORT).show();
-                                    // Navigate back to donation drives
                                     Navigation.findNavController(requireView())
                                             .navigate(R.id.donationDrivesFragment);
                                 }
