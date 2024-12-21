@@ -77,7 +77,7 @@ public class MainActivity extends AppCompatActivity {
                             bottomNav.getMenu().clear();
                             bottomNav.inflateMenu(R.menu.super_user_nav_menu);
                             // Set start destination to Map for super users
-                            navController.getGraph().setStartDestination(R.id.sitesMapFragment);
+                            navController.getGraph().setStartDestination(R.id.discoverFragment);
                             break;
                     }
 
