@@ -21,6 +21,7 @@ import com.google.firebase.auth.FirebaseUser;
 public class ProfileFragment extends Fragment {
     private TextView emailText;
     private TextView fullNameText;
+    private TextView roleText;
     private Button logoutButton;
     private FirebaseAuth mAuth;
     private UserRepository userRepository;
@@ -41,6 +42,7 @@ public class ProfileFragment extends Fragment {
         // Initialize views
         emailText = view.findViewById(R.id.emailText);
         fullNameText = view.findViewById(R.id.fullNameText);
+        roleText = view.findViewById(R.id.roleText);
         logoutButton = view.findViewById(R.id.logoutButton);
 
         // Set email text and load user data
@@ -60,6 +62,7 @@ public class ProfileFragment extends Fragment {
             public void onSuccess(User user) {
                 if (user != null && isAdded()) {  // Check if fragment is still attached
                     fullNameText.setText(user.getFullName());
+                    setRole(user.getRole());
                 }
             }
 
@@ -82,5 +85,19 @@ public class ProfileFragment extends Fragment {
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         startActivity(intent);
         requireActivity().finish();
+    }
+
+    private void setRole(String role) {
+        switch (role) {
+            case User.ROLE_DONOR:
+                roleText.setText("Donor");
+                break;
+            case User.ROLE_SUPER_USER:
+                roleText.setText("Super User");
+                break;
+            case User.ROLE_SITE_MANAGER:
+                roleText.setText("Site Manager");
+                break;
+        }
     }
 }
