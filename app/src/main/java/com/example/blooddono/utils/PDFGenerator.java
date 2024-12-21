@@ -6,6 +6,7 @@ import android.os.Environment;
 
 import com.example.blooddono.models.Donation;
 import com.example.blooddono.models.DonationDrive;
+import com.example.blooddono.models.DonationSite;
 import com.itextpdf.text.BaseColor;
 import com.itextpdf.text.Chunk;
 import com.itextpdf.text.Document;
@@ -162,6 +163,97 @@ public class PDFGenerator {
             cell.setBackgroundColor(BaseColor.LIGHT_GRAY);
             cell.setPadding(5);
             table.addCell(cell);
+        }
+    }
+
+    public static void generateSiteReport(Context context, DonationSite site, List<Donation> donations,
+                                          OnPDFGeneratedListener listener) {
+        try {
+            // Create PDF document
+            Document document = new Document();
+
+            // Create file in app's private documents directory
+            File outputDir = new File(context.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS), "reports");
+            if (!outputDir.exists()) {
+                outputDir.mkdirs();
+            }
+
+            String fileName = "site_report_" + site.getId() + ".pdf";
+            File outputFile = new File(outputDir, fileName);
+
+            PdfWriter.getInstance(document, new FileOutputStream(outputFile));
+            document.open();
+
+            // Add site details
+            Paragraph title = new Paragraph("Blood Donation Site Report", TITLE_FONT);
+            title.setAlignment(Element.ALIGN_CENTER);
+            title.setSpacingAfter(20);
+            document.add(title);
+
+            document.add(new Paragraph("Site Details:", HEADER_FONT));
+            document.add(new Paragraph("Name: " + site.getName(), NORMAL_FONT));
+            document.add(new Paragraph("Address: " + site.getAddress(), NORMAL_FONT));
+            document.add(new Paragraph("Type: " + (DonationSite.TYPE_PERMANENT.equals(site.getType()) ?
+                    "Permanent" : "Limited Time"), NORMAL_FONT));
+
+            if (DonationSite.TYPE_LIMITED.equals(site.getType())) {
+                document.add(new Paragraph("Start Date: " +
+                        dateFormat.format(new Date(site.getStartDate())), NORMAL_FONT));
+                document.add(new Paragraph("End Date: " +
+                        dateFormat.format(new Date(site.getEndDate())), NORMAL_FONT));
+            }
+
+            // Add blood types section
+            document.add(Chunk.NEWLINE);
+            document.add(new Paragraph("Accepted Blood Types:", HEADER_FONT));
+            for (String bloodType : site.getNeededBloodTypes()) {
+                document.add(new Paragraph("• " + bloodType, NORMAL_FONT));
+            }
+
+            // Add donations table if there are any
+            if (!donations.isEmpty()) {
+                document.add(Chunk.NEWLINE);
+                document.add(new Paragraph("Donation Records:", HEADER_FONT));
+
+                PdfPTable table = new PdfPTable(5);
+                table.setWidthPercentage(100);
+
+                // Add headers
+                String[] headers = {"Donor Name", "Blood Types", "Status", "Date", "Collected Amounts"};
+                for (String header : headers) {
+                    PdfPCell cell = new PdfPCell(new Phrase(header, HEADER_FONT));
+                    cell.setBackgroundColor(BaseColor.LIGHT_GRAY);
+                    cell.setPadding(5);
+                    table.addCell(cell);
+                }
+
+                // Add data rows
+                for (Donation donation : donations) {
+                    table.addCell(new Phrase(donation.getDonorName(), NORMAL_FONT));
+                    table.addCell(new Phrase(String.join(", ", donation.getBloodTypes()), NORMAL_FONT));
+                    table.addCell(new Phrase(donation.getStatus().toUpperCase(), NORMAL_FONT));
+                    table.addCell(new Phrase(dateFormat.format(new Date(donation.getCreatedAt())), NORMAL_FONT));
+
+                    StringBuilder amounts = new StringBuilder();
+                    if (donation.getCollectedAmounts() != null) {
+                        for (Map.Entry<String, Double> entry : donation.getCollectedAmounts().entrySet()) {
+                            amounts.append(entry.getKey())
+                                    .append(": ")
+                                    .append(String.format("%.1f", entry.getValue()))
+                                    .append(" mL\n");
+                        }
+                    }
+                    table.addCell(new Phrase(amounts.toString(), NORMAL_FONT));
+                }
+
+                document.add(table);
+            }
+
+            document.close();
+            listener.onSuccess(outputFile);
+
+        } catch (DocumentException | IOException e) {
+            listener.onError(e);
         }
     }
 }

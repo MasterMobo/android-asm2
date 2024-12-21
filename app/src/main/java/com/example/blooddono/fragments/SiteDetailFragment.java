@@ -1,7 +1,9 @@
 package com.example.blooddono.fragments;
 
 import android.app.ProgressDialog;
+import android.content.Intent;
 import android.graphics.Color;
+import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -12,6 +14,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AlertDialog;
+import androidx.core.content.FileProvider;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -26,12 +29,15 @@ import com.example.blooddono.models.User;
 import com.example.blooddono.repositories.DonationRepository;
 import com.example.blooddono.repositories.DonationSiteRepository;
 import com.example.blooddono.repositories.UserRepository;
+import com.example.blooddono.utils.PDFGenerator;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.firebase.auth.FirebaseAuth;
 
+import java.io.File;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -52,7 +58,6 @@ public class SiteDetailFragment extends Fragment {
     private TextView hoursTypeText;
     private LinearLayout operatingHoursLayout;
     private MaterialCardView datesCard;
-    private MaterialCardView hoursCard;
     private ChipGroup bloodTypeChipGroup;
     private MaterialButton donateButton;
     private DonationSite currentSite;
@@ -61,6 +66,8 @@ public class SiteDetailFragment extends Fragment {
     private DonationsAdapter donationsAdapter;
     private MaterialButton volunteerButton;
     private TextView volunteersText;
+    private FloatingActionButton downloadFab;
+    private ProgressDialog progressDialog;
 
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
@@ -85,13 +92,14 @@ public class SiteDetailFragment extends Fragment {
         hoursTypeText = view.findViewById(R.id.hoursTypeText);
         operatingHoursLayout = view.findViewById(R.id.operatingHoursLayout);
         datesCard = view.findViewById(R.id.datesCard);
-        hoursCard = view.findViewById(R.id.hoursCard);
         bloodTypeChipGroup = view.findViewById(R.id.bloodTypeChipGroup);
         donateButton = view.findViewById(R.id.donateButton);
         donationsRecyclerView = view.findViewById(R.id.donationsRecyclerView);
         noDonationsText = view.findViewById(R.id.noDonationsText);
         volunteerButton = view.findViewById(R.id.volunteerButton);
         volunteersText = view.findViewById(R.id.volunteersText);
+        downloadFab = view.findViewById(R.id.downloadFab);
+        downloadFab.setOnClickListener(v -> handleDownloadReport());
 
         // Setup donations RecyclerView
         donationsAdapter = new DonationsAdapter(requireContext());
@@ -138,6 +146,7 @@ public class SiteDetailFragment extends Fragment {
                     public void onSuccess(User user) {
                         boolean isOwner = user.getUid().equals(site.getOwnerId());
                         donationsAdapter.setShowConfirmButton(isOwner);
+                        downloadFab.setVisibility(isOwner ? View.VISIBLE : View.GONE);
 
                         if (User.ROLE_DONOR.equals(user.getRole())) {
                             // Donor can only see donate button
@@ -168,7 +177,8 @@ public class SiteDetailFragment extends Fragment {
                             }
 
                             volunteerButton.setVisibility(View.VISIBLE);
-                            volunteerButton.setOnClickListener(v -> handleVolunteer());                        }
+                            volunteerButton.setOnClickListener(v -> handleVolunteer());
+                        }
                     }
 
                     @Override
@@ -187,6 +197,7 @@ public class SiteDetailFragment extends Fragment {
             }
         });
     }
+
     private void loadOwnerDetails(String ownerId) {
         userRepository.getUser(ownerId, new UserRepository.OnCompleteListener<User>() {
             @Override
@@ -433,5 +444,70 @@ public class SiteDetailFragment extends Fragment {
                                 Toast.LENGTH_SHORT).show();
                     }
                 });
+    }
+
+    private void handleDownloadReport() {
+        if (currentSite == null) return;
+
+        progressDialog = new ProgressDialog(requireContext());
+        progressDialog.setMessage("Generating PDF report...");
+        progressDialog.setCancelable(false);
+        progressDialog.show();
+
+        donationRepository.getDonationsBySite(currentSite.getId(),
+                new DonationRepository.OnCompleteListener<List<Donation>>() {
+                    @Override
+                    public void onSuccess(List<Donation> donations) {
+                        PDFGenerator.generateSiteReport(requireContext(),
+                                currentSite, donations,
+                                new PDFGenerator.OnPDFGeneratedListener() {
+                                    @Override
+                                    public void onSuccess(File pdfFile) {
+                                        progressDialog.dismiss();
+                                        showSuccessDialog(pdfFile);
+                                    }
+
+                                    @Override
+                                    public void onError(Exception e) {
+                                        progressDialog.dismiss();
+                                        Toast.makeText(requireContext(),
+                                                "Error generating PDF: " + e.getMessage(),
+                                                Toast.LENGTH_SHORT).show();
+                                    }
+                                });
+                    }
+
+                    @Override
+                    public void onError(Exception e) {
+                        progressDialog.dismiss();
+                        Toast.makeText(requireContext(),
+                                "Error fetching donations: " + e.getMessage(),
+                                Toast.LENGTH_SHORT).show();
+                    }
+                });
+    }
+
+
+    private void showSuccessDialog(File pdfFile) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(requireContext());
+        builder.setTitle("Report Generated")
+                .setMessage("PDF report has been saved to:\n" + pdfFile.getPath())
+                .setPositiveButton("Share", (dialog, which) -> {
+                    // Create content URI using FileProvider
+                    Uri contentUri = FileProvider.getUriForFile(requireContext(),
+                            "com.example.blooddono.fileprovider",
+                            pdfFile);
+
+                    // Create share intent
+                    Intent shareIntent = new Intent(Intent.ACTION_SEND);
+                    shareIntent.setType("application/pdf");
+                    shareIntent.putExtra(Intent.EXTRA_STREAM, contentUri);
+                    shareIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+
+                    // Start share activity
+                    startActivity(Intent.createChooser(shareIntent, "Share PDF Report"));
+                })
+                .setNeutralButton("OK", null)
+                .show();
     }
 }
