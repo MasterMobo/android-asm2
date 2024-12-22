@@ -16,9 +16,11 @@ import androidx.core.app.NotificationManagerCompat;
 import com.example.blooddono.MainActivity;
 import com.example.blooddono.R;
 import com.example.blooddono.models.Donation;
+import com.example.blooddono.models.DonationSite;
+import com.example.blooddono.models.User;
 
 public class NotificationUtils {
-    private static final String DONATION_CHANNEL_ID = "donation_notifications";
+    public static final String DONATION_CHANNEL_ID = "donation_notifications";
     private static final int NOTIFICATION_ID = 1;
 
     public static void createNotificationChannels(Context context) {
@@ -82,6 +84,46 @@ public class NotificationUtils {
         } catch (SecurityException e) {
             // Handle case where notification permission is not granted
             Log.e("NotificationUtils", "Error sending notification: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    public static void sendVolunteerNotification(Context context, DonationSite site, User volunteer) {
+        createNotificationChannels(context); // Ensure channel exists
+
+        // Create an explicit intent for the MainActivity
+        Intent intent = new Intent(context, MainActivity.class);
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+
+        PendingIntent pendingIntent = PendingIntent.getActivity(
+                context,
+                0,
+                intent,
+                PendingIntent.FLAG_IMMUTABLE
+        );
+
+        Uri defaultSoundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
+
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(context, DONATION_CHANNEL_ID)
+                .setSmallIcon(R.drawable.ic_launcher_foreground)
+                .setContentTitle("New Volunteer Registration")
+                .setContentText(volunteer.getFullName() + " has registered as a volunteer at " + site.getName())
+                .setStyle(new NotificationCompat.BigTextStyle()
+                        .bigText(volunteer.getFullName() + " has registered as a volunteer at " + site.getName()))
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setCategory(NotificationCompat.CATEGORY_MESSAGE)
+                .setAutoCancel(true)
+                .setSound(defaultSoundUri)
+                .setVibrate(new long[]{0, 500, 200, 500})
+                .setDefaults(NotificationCompat.DEFAULT_ALL)
+                .setContentIntent(pendingIntent);
+
+        try {
+            NotificationManagerCompat notificationManager = NotificationManagerCompat.from(context);
+            notificationManager.notify((int) System.currentTimeMillis(), builder.build());
+            Log.d("NotificationUtils", "Volunteer notification sent!");
+        } catch (SecurityException e) {
+            Log.e("NotificationUtils", "Error sending volunteer notification: " + e.getMessage());
             e.printStackTrace();
         }
     }

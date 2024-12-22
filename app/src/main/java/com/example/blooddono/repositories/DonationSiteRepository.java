@@ -4,6 +4,8 @@ import android.util.Log;
 
 import com.example.blooddono.models.DayHours;
 import com.example.blooddono.models.DonationSite;
+import com.example.blooddono.models.User;
+import com.example.blooddono.utils.NotificationUtils;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.firestore.DocumentSnapshot;
 import com.google.firebase.firestore.FieldValue;
@@ -171,13 +173,43 @@ public class DonationSiteRepository {
     }
 
     public void addVolunteer(String siteId, String volunteerId, OnCompleteListener<Void> listener) {
-        db.collection(COLLECTION_NAME)
-                .document(siteId)
-                .update("volunteerIds", FieldValue.arrayUnion(volunteerId))
-                .addOnSuccessListener(aVoid -> listener.onSuccess(null))
-                .addOnFailureListener(listener::onError);
-    }
+        // First get the site details to include in notification
+        getDonationSite(siteId, new OnCompleteListener<DonationSite>() {
+            @Override
+            public void onSuccess(DonationSite site) {
+                // Then get the volunteer's details
+                new UserRepository().getUser(volunteerId, new UserRepository.OnCompleteListener<User>() {
+                    @Override
+                    public void onSuccess(User volunteer) {
+                        // Add volunteer to site
+                        db.collection(COLLECTION_NAME)
+                                .document(siteId)
+                                .update("volunteerIds", FieldValue.arrayUnion(volunteerId))
+                                .addOnSuccessListener(aVoid -> {
+                                    // Send notification after successful update
+                                    NotificationUtils.sendVolunteerNotification(
+                                            db.getApp().getApplicationContext(),
+                                            site,
+                                            volunteer
+                                    );
+                                    listener.onSuccess(null);
+                                })
+                                .addOnFailureListener(listener::onError);
+                    }
 
+                    @Override
+                    public void onError(Exception e) {
+                        listener.onError(e);
+                    }
+                });
+            }
+
+            @Override
+            public void onError(Exception e) {
+                listener.onError(e);
+            }
+        });
+    }
     private DonationSite documentToDonationSite(DocumentSnapshot document) {
         String type = document.getString("type");
         if (type == null) {
