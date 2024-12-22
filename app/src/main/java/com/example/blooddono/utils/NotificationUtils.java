@@ -7,6 +7,8 @@ import android.content.Context;
 import android.content.Intent;
 import android.os.Build;
 import android.util.Log;
+import android.media.RingtoneManager;
+import android.net.Uri;
 
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
@@ -25,9 +27,12 @@ public class NotificationUtils {
             NotificationChannel donationChannel = new NotificationChannel(
                     DONATION_CHANNEL_ID,
                     "Donation Notifications",
-                    NotificationManager.IMPORTANCE_DEFAULT
+                    NotificationManager.IMPORTANCE_HIGH  // Changed to HIGH importance
             );
             donationChannel.setDescription("Notifications for new blood donations");
+            donationChannel.enableVibration(true);
+            donationChannel.enableLights(true);
+            donationChannel.setLockscreenVisibility(NotificationCompat.VISIBILITY_PUBLIC);
 
             // Register the channel with the system
             NotificationManager notificationManager =
@@ -49,14 +54,24 @@ public class NotificationUtils {
                 PendingIntent.FLAG_IMMUTABLE
         );
 
+        // Get default notification sound
+        Uri defaultSoundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
+
         // Build the notification
         NotificationCompat.Builder builder = new NotificationCompat.Builder(context, DONATION_CHANNEL_ID)
-                .setSmallIcon(R.drawable.ic_launcher_foreground)  // You'll need to add this icon
+                .setSmallIcon(R.drawable.ic_launcher_foreground)
                 .setContentTitle("New Blood Donation Registration")
                 .setContentText("Donor " + donation.getDonorName() + " has registered to donate " +
                         String.join(", ", donation.getBloodTypes()))
-                .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                .setStyle(new NotificationCompat.BigTextStyle()
+                        .bigText("Donor " + donation.getDonorName() + " has registered to donate " +
+                                String.join(", ", donation.getBloodTypes())))
+                .setPriority(NotificationCompat.PRIORITY_HIGH) // Set high priority
+                .setCategory(NotificationCompat.CATEGORY_MESSAGE)
                 .setAutoCancel(true)
+                .setSound(defaultSoundUri)
+                .setVibrate(new long[]{0, 500, 200, 500}) // Vibration pattern
+                .setDefaults(NotificationCompat.DEFAULT_ALL)
                 .setContentIntent(pendingIntent);
 
         // Show the notification
@@ -66,7 +81,7 @@ public class NotificationUtils {
             Log.d("NotificationUtils", "Notification sent!");
         } catch (SecurityException e) {
             // Handle case where notification permission is not granted
-            Log.e("NotificationUtils", e.getMessage());
+            Log.e("NotificationUtils", "Error sending notification: " + e.getMessage());
             e.printStackTrace();
         }
     }

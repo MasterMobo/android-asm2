@@ -1,6 +1,7 @@
 package com.example.blooddono;
 
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.util.Log;
 import android.widget.Toast;
@@ -13,6 +14,7 @@ import com.example.blooddono.models.DonationDrive;
 import com.example.blooddono.models.User;
 import com.example.blooddono.repositories.DonationDriveRepository;
 import com.example.blooddono.repositories.UserRepository;
+import com.example.blooddono.utils.PermissionUtils;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
@@ -28,6 +30,9 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+        // Request notification permission
+        PermissionUtils.requestNotificationPermission(this);
 
         // Initialize repositories
         mAuth = FirebaseAuth.getInstance();
@@ -135,5 +140,19 @@ public class MainActivity extends AppCompatActivity {
         Intent intent = new Intent(this, LoginActivity.class);
         startActivity(intent);
         finish();
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == 123) { // NOTIFICATION_PERMISSION_CODE
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                // Permission granted, notifications will work
+            } else {
+                // Permission denied, you might want to show a message to the user
+                Toast.makeText(this, "Notification permission denied. You won't receive notifications.",
+                        Toast.LENGTH_LONG).show();
+            }
+        }
     }
 }
